@@ -45,7 +45,7 @@ describe('DB2 Error Handling Unit Tests', () => {
   describe('Error Enhancement', () => {
     test('should enhance DB2 errors with metadata', () => {
       const originalError = {
-        message: 'SQL0204N "TEST"."NONEXISTENT" is an undefined name. SQLSTATE=42704',
+        message: 'SQL0204N TEST.NONEXISTENT is an undefined name. SQLSTATE=42704',
         sqlcode: -204,
         state: '42704',
       };
@@ -57,12 +57,12 @@ describe('DB2 Error Handling Unit Tests', () => {
       expect(enhancedError.sqlState).toBe('42704');
       expect(enhancedError.errorType).toBe('OBJECT_NOT_FOUND');
       expect(enhancedError.originalError).toBe(originalError);
-      expect(enhancedError.message).toBe('SQL0204N "TEST"."NONEXISTENT" is an undefined name. SQLSTATE=42704');
+      expect(enhancedError.message).toBe('SQL0204N TEST.NONEXISTENT is an undefined name. SQLSTATE=42704');
     });
 
     test('should handle syntax errors', () => {
       const syntaxError = {
-        message: 'SQL0104N An unexpected token "SELCT" was found following "". SQLSTATE=42601',
+        message: 'SQL0104N An unexpected token SELCT was found following . SQLSTATE=42601',
         sqlcode: -104,
         state: '42601',
       };

@@ -46,9 +46,7 @@ class Db2Client extends Client {
   }
 
   wrapIdentifierImpl(value) {
-    if (value === '*') return value;
-    // DB2 uses double quotes for identifiers
-    return `"${value.replace(/"/g, '""')}"`;
+    return value;
   }
 
   // DB2 Error Code Mapping - delegated to db2-errors module
@@ -77,7 +75,7 @@ class Db2Client extends Client {
         // Set connection timeout
         if (connectionTimeout > 0) {
           timeoutHandle = setTimeout(() => {
-            reject(new Error(`Connection timeout after ${connectionTimeout}ms`));
+            reject(new Error('Connection timeout after ' + connectionTimeout + 'ms'));
           }, connectionTimeout);
         }
 

@@ -124,7 +124,7 @@ describe('DB2 PIMS Integration Tests', () => {
 
       const compiled = query.toSQL();
       expect(compiled.sql).toContain('fetch first 3 rows only');
-      expect(compiled.sql).toContain('"TABNAME"');
+      expect(compiled.sql).toContain('TABNAME');
 
       const result = await query;
       expect(Array.isArray(result)).toBe(true);

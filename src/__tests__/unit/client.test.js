@@ -29,25 +29,25 @@ describe('DB2 Client Unit Tests', () => {
   });
 
   describe('Identifier Wrapping', () => {
-    test('should wrap identifiers with double quotes', () => {
-      expect(client.wrapIdentifierImpl('table_name')).toBe('"table_name"');
-      expect(client.wrapIdentifierImpl('column_name')).toBe('"column_name"');
-      expect(client.wrapIdentifierImpl('SCHEMA')).toBe('"SCHEMA"');
+    test('should return identifiers as-is for DB2', () => {
+      expect(client.wrapIdentifierImpl('table_name')).toBe('table_name');
+      expect(client.wrapIdentifierImpl('column_name')).toBe('column_name');
+      expect(client.wrapIdentifierImpl('SCHEMA')).toBe('SCHEMA');
     });
 
     test('should not wrap asterisk', () => {
       expect(client.wrapIdentifierImpl('*')).toBe('*');
     });
 
-    test('should escape double quotes in identifiers', () => {
-      expect(client.wrapIdentifierImpl('col"name')).toBe('"col""name"');
-      expect(client.wrapIdentifierImpl('tab"le"name')).toBe('"tab""le""name"');
+    test('should handle double quotes in identifiers', () => {
+      expect(client.wrapIdentifierImpl('col"name')).toBe('col"name');
+      expect(client.wrapIdentifierImpl('tab"le"name')).toBe('tab"le"name');
     });
 
     test('should handle empty and special identifiers', () => {
-      expect(client.wrapIdentifierImpl('')).toBe('""');
-      expect(client.wrapIdentifierImpl('123table')).toBe('"123table"');
-      expect(client.wrapIdentifierImpl('table-name')).toBe('"table-name"');
+      expect(client.wrapIdentifierImpl('')).toBe('');
+      expect(client.wrapIdentifierImpl('123table')).toBe('123table');
+      expect(client.wrapIdentifierImpl('table-name')).toBe('table-name');
     });
   });
 
