@@ -16,6 +16,14 @@ const { Db2TableCompiler } = require('./schema/db2-tablecompiler');
 const { Db2ColumnCompiler } = require('./schema/db2-columncompiler');
 
 class Db2Client extends Client {
+  constructor(config = {}) {
+    // Ensure client is set to avoid deprecation warning
+    if (!config.client) {
+      config.client = 'db2';
+    }
+    super(config);
+  }
+
   _driver() {
     return db2;
   }
