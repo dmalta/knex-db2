@@ -2,14 +2,15 @@
 const knex = require('knex');
 const Db2Client = require('../client');
 
-// PIMS connection config
-const PIMS_CONFIG = {
-  hostname: 'mbgmvsc.pok.ibm.com',
-  port: 3906,
-  database: 'DB2C',
-  uid: 'PRESS',
-  pwd: 'VCKDTCW9',
-};
+// Load DB2 connection config from JSON file
+let DB_CONFIG;
+try {
+  DB_CONFIG = require('./integration/db2-config.json');
+} catch {
+  // Fallback to example config if the real config doesn't exist
+  console.warn('db2-config.json not found, using example config. Copy db2-config-example.json to db2-config.json and update with real credentials.');
+  DB_CONFIG = require('./integration/db2-config-example.json');
+}
 
 // const TABLESPACE = 'DSQDBDEF.DSQTSDEF'; // For future DDL operations
 
@@ -20,7 +21,7 @@ describe('DB2 PIMS Integration Tests', () => {
     // Create knex instance with our DB2 client
     db = knex({
       client: Db2Client,
-      connection: PIMS_CONFIG,
+      connection: DB_CONFIG,
       pool: {
         min: 1,
         max: 5,

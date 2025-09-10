@@ -1,0 +1,8 @@
+{
+    "hostname": "your-db2-hostname.com",
+    "port": 3906,
+    "database": "YOUR_DB",
+    "user": "YOUR_USERNAME",
+    "password": "YOUR_PASSWORD",
+    "schema": "YOUR_SCHEMA.YOUR_TABLESPACE"
+}

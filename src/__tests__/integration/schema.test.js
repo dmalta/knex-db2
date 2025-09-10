@@ -2,7 +2,7 @@
 // Tests table creation, alteration, and schema introspection
 const knex = require('knex');
 const Db2Client = require('../../client');
-const { PIMS_CONFIG_KNEX, POOL_CONFIG, shouldRunRealTests, TEST_TIMEOUT } = require('../helpers/test-config');
+const { DB_CONFIG, POOL_CONFIG, shouldRunRealTests, TEST_TIMEOUT } = require('../helpers/test-config');
 
 const runTests = shouldRunRealTests();
 
@@ -14,7 +14,7 @@ const runTests = shouldRunRealTests();
   beforeAll(async () => {
     db = knex({
       client: Db2Client,
-      connection: PIMS_CONFIG_KNEX,
+      connection: DB_CONFIG,
       pool: POOL_CONFIG,
     });
   }, TEST_TIMEOUT);

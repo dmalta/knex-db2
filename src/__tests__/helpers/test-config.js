@@ -1,25 +1,24 @@
 // Shared test configuration and utilities for DB2 tests
 
-// PIMS test database configuration
-const PIMS_CONFIG = {
-  hostname: 'mbgmvsc.pok.ibm.com',
-  port: 3906,
-  database: 'DB2C',
-  uid: 'PRESS',
-  pwd: 'VCKDTCW9',
+// Load DB2 config from JSON file
+let dbConfig;
+try {
+  dbConfig = require('../integration/db2-config.json');
+} catch {
+  // Fallback to example config if the real config doesn't exist
+  console.warn('db2-config.json not found, using example config. Copy db2-config-example.json to db2-config.json and update with real credentials.');
+  dbConfig = require('../integration/db2-config-example.json');
+}
+
+// DB2 test database configuration
+const DB_CONFIG = {
+  ...dbConfig,
   connectionTimeout: 15000,
   queryTimeout: 30000,
 };
 
-// Alternative connection config formats for compatibility
-const PIMS_CONFIG_KNEX = {
-  ...PIMS_CONFIG,
-  user: PIMS_CONFIG.uid,
-  password: PIMS_CONFIG.pwd,
-};
-
 // Test tablespace for DDL operations
-const TEST_TABLESPACE = 'DSQDBDEF.DSQTSDEF';
+const TEST_TABLESPACE = dbConfig.schema;
 
 // Pool configuration for integration tests
 const POOL_CONFIG = {
@@ -47,8 +46,7 @@ const skipIfNoRealDB = (testName) => {
 const TEST_TIMEOUT = 30000;
 
 module.exports = {
-  PIMS_CONFIG,
-  PIMS_CONFIG_KNEX,
+  DB_CONFIG,
   TEST_TABLESPACE,
   POOL_CONFIG,
   shouldRunRealTests,

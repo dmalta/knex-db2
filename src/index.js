@@ -7,6 +7,7 @@ const {
   isDB2ErrorCode,
   isRetryableError,
   DB2_ERROR_MAP,
+  ERROR_CATEGORY,
   ERROR_CATEGORIES
 } = require('./db2-errors');
 
@@ -21,4 +22,5 @@ module.exports.getErrorCategory = getErrorCategory;
 module.exports.isDB2ErrorCode = isDB2ErrorCode;
 module.exports.isRetryableError = isRetryableError;
 module.exports.DB2_ERROR_MAP = DB2_ERROR_MAP;
+module.exports.ERROR_CATEGORY = ERROR_CATEGORY;
 module.exports.ERROR_CATEGORIES = ERROR_CATEGORIES;
