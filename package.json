@@ -1,5 +1,5 @@
 {
-  "name": "knex-db2",
+  "name": "@dmalta/knex-db2",
   "version": "1.0.0",
   "description": "A Knex.js client for IBM Db2 for z/OS",
   "main": "src/index.js",
