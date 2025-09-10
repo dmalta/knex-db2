@@ -1,11 +1,21 @@
 # Knex DB2 Client
 
-A Knex.js client adapter for IBM DB2 for z/OS database connections.
+A Knex.js client adapter for IBM DB2 for z/OS database connections with comprehensive error handling.
 
 ## Documentation
 
 - **[Windows DB2 Client Setup Guide](./docs/windows-db2-client-setup.md)** - Complete guide for setting up IBM DB2 client and building native bindings on Windows
 - **[Troubleshooting Checklist](./docs/troubleshooting-checklist.md)** - Quick reference for resolving common build and connection issues
+- **[Error Handling Examples](./docs/error-handling-examples.md)** - Comprehensive guide to using the enhanced DB2 error handling features
+
+## Features
+
+- ✅ **Full Knex.js compatibility** - Works seamlessly with existing Knex applications
+- ✅ **Enhanced error handling** - Comprehensive DB2 error code mapping and categorization
+- ✅ **Connection management** - Robust connection pooling and timeout handling
+- ✅ **Schema operations** - Complete DDL support for tables, indexes, and constraints
+- ✅ **Transaction support** - Full transaction lifecycle management
+- ✅ **Query optimization** - DB2-specific query compilation and optimization
 
 ## Using This Client with Knex
 
@@ -46,6 +56,32 @@ const db = knex({
   client: 'knex-db2',  // Knex will require() this automatically
   connection: { /* ... */ }
 });
+```
+
+### Enhanced Error Handling
+
+The client provides comprehensive DB2 error handling utilities:
+
+```javascript
+// Import error handling utilities
+const { 
+  DB2Error, 
+  handleDB2Error, 
+  isRetryableError, 
+  getErrorType,
+  DB2_ERROR_MAP 
+} = require('knex-db2');
+
+try {
+  const results = await db('EMPLOYEES').select('*');
+} catch (error) {
+  if (error instanceof DB2Error) {
+    console.log('Error Type:', error.errorType);
+    console.log('Category:', error.errorCategory);
+    console.log('User Message:', error.getUserMessage());
+    console.log('Is Retryable:', error.isRetryable());
+  }
+}
 ```
 
 **Option 3: ES Module Import**

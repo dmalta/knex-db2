@@ -1,12 +1,6 @@
 const QueryCompiler = require('knex/lib/query/querycompiler');
 
 class Db2QueryCompiler extends QueryCompiler {
-  constructor(client, builder, formatter) {
-    super(client, builder, formatter);
-  }
-
-  // DB2 specific query compilation methods
-
   // Override limit/offset for DB2 syntax
   limit() {
     const noLimit = !this.single.limit && this.single.limit !== 0;

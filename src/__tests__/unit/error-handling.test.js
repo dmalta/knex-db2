@@ -14,7 +14,7 @@ describe('DB2 Error Handling Unit Tests', () => {
 
       // Connection errors
       expect(errorMap['-30081']).toBe('CONNECTION_FAILED');
-      expect(errorMap['-30082']).toBe('CONNECTION_TIMEOUT');
+      expect(errorMap['-30082']).toBe('AUTHENTICATION_FAILED');
       expect(errorMap['-1024']).toBe('DATABASE_NOT_FOUND');
 
       // SQL syntax errors
@@ -164,7 +164,7 @@ describe('DB2 Error Handling Unit Tests', () => {
       retriableErrors.forEach((error) => {
         const enhanced = client.handleError(error);
         const errorType = enhanced.errorType;
-        expect(['CONNECTION_FAILED', 'CONNECTION_TIMEOUT', 'LOCK_TIMEOUT', 'DEADLOCK_DETECTED']).toContain(errorType);
+        expect(['CONNECTION_FAILED', 'AUTHENTICATION_FAILED', 'LOCK_TIMEOUT', 'DEADLOCK_DETECTED']).toContain(errorType);
       });
     });
 

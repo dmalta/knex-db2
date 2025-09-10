@@ -14,6 +14,7 @@ const { Db2QueryCompiler } = require('./query/db2-querycompiler');
 const { Db2SchemaCompiler } = require('./schema/db2-compiler');
 const { Db2TableCompiler } = require('./schema/db2-tablecompiler');
 const { Db2ColumnCompiler } = require('./schema/db2-columncompiler');
+const { handleDB2Error, DB2_ERROR_MAP } = require('./db2-errors');
 
 class Db2Client extends Client {
   constructor(config = {}) {
@@ -50,56 +51,14 @@ class Db2Client extends Client {
     return `"${value.replace(/"/g, '""')}"`;
   }
 
-  // DB2 Error Code Mapping
+  // DB2 Error Code Mapping - delegated to db2-errors module
   getErrorMap() {
-    return {
-      // Connection errors
-      '-30081': 'CONNECTION_FAILED',
-      '-30082': 'CONNECTION_TIMEOUT',
-      '-1024': 'DATABASE_NOT_FOUND',
-
-      // Authentication errors
-      '-1403': 'INVALID_CREDENTIALS',
-      '-551': 'INSUFFICIENT_PRIVILEGES',
-
-      // SQL errors
-      '-104': 'SYNTAX_ERROR',
-      '-199': 'SYNTAX_ERROR', // Illegal use of reserved word
-      '-204': 'OBJECT_NOT_FOUND',
-      '-206': 'COLUMN_NOT_FOUND',
-      '-407': 'NULL_VALUE_NOT_ALLOWED',
-      '-530': 'FOREIGN_KEY_VIOLATION',
-      '-803': 'DUPLICATE_KEY',
-
-      // Transaction errors
-      '-913': 'DEADLOCK_DETECTED',
-      '-911': 'LOCK_TIMEOUT',
-
-      // Resource errors
-      '-289': 'TABLESPACE_FULL',
-      '-904': 'RESOURCE_UNAVAILABLE',
-    };
+    return DB2_ERROR_MAP;
   }
 
-  // Enhanced error handling
-  handleError(error) {
-    if (!error.sqlcode && !error.state) {
-      return error; // Not a DB2 error
-    }
-
-    const errorMap = this.getErrorMap();
-    const sqlCode = error.sqlcode || error.code;
-    const errorType = errorMap[sqlCode] || 'UNKNOWN_ERROR';
-
-    // Create enhanced error object
-    const enhancedError = new Error(error.message);
-    enhancedError.name = 'DB2Error';
-    enhancedError.sqlCode = sqlCode;
-    enhancedError.sqlState = error.state;
-    enhancedError.errorType = errorType;
-    enhancedError.originalError = error;
-
-    return enhancedError;
+  // Enhanced error handling - delegated to db2-errors module
+  handleError(error, sql = null, bindings = null) {
+    return handleDB2Error(error, sql, bindings);
   }
 
   // Get a raw connection for DB2 with enhanced error handling
@@ -213,15 +172,9 @@ class Db2Client extends Client {
       return Promise.resolve(false);
     }
 
-    // Additional DB2-specific validation
-    // Check if connection is still active (ibm_db specific)
-    if (connection.connected !== undefined && !connection.connected) {
-      return Promise.resolve(false);
-    }
-
     // Execute SYSDUMMY1 query to validate connection is working
     return new Promise((resolve) => {
-      connection.query('SELECT 1 AS test FROM SYSIBM.SYSDUMMY1', [], (err, result) => {
+      connection.query('SELECT * FROM SYSIBM.SYSDUMMY1', [], (err, result) => {
         if (err) {
           resolve(false);
         } else {
@@ -251,9 +204,7 @@ class Db2Client extends Client {
         if (timeoutHandle) clearTimeout(timeoutHandle);
 
         if (err) {
-          const enhancedError = this.handleError(err);
-          enhancedError.sql = obj.sql;
-          enhancedError.bindings = obj.bindings;
+          const enhancedError = this.handleError(err, obj.sql, obj.bindings);
           reject(enhancedError);
         } else {
           const response = {
