@@ -11,9 +11,9 @@ describe('DB2 Error Handling Module', () => {
       sqlcode: -204,
       state: '42704'
     };
-    
+
     const enhancedError = handleDB2Error(mockError, 'SELECT * FROM nonexistent_table', []);
-    
+
     expect(enhancedError).toBeInstanceOf(DB2Error);
     expect(enhancedError.name).toBe('DB2Error');
     expect(enhancedError.errorType).toBe('OBJECT_NOT_FOUND');
@@ -28,9 +28,9 @@ describe('DB2 Error Handling Module', () => {
       sqlcode: -551,
       state: '42501'
     };
-    
+
     const enhancedError = handleDB2Error(authError);
-    
+
     expect(enhancedError.errorType).toBe('INSUFFICIENT_PRIVILEGES');
     expect(enhancedError.errorCategory).toBe('AUTHORIZATION');
     expect(enhancedError.getUserMessage()).toBe('You do not have permission to perform this operation.');
@@ -41,9 +41,9 @@ describe('DB2 Error Handling Module', () => {
       message: 'Deadlock detected',
       sqlcode: -913
     };
-    
+
     const enhancedError = handleDB2Error(lockError);
-    
+
     expect(enhancedError.errorType).toBe('DEADLOCK_DETECTED');
     expect(enhancedError.isRetryable()).toBe(true);
     expect(enhancedError.getUserMessage()).toBe('A deadlock was detected. Please try again.');
@@ -54,11 +54,11 @@ describe('DB2 Error Handling Module', () => {
       message: 'Duplicate key',
       sqlcode: -803
     });
-    
+
     expect(isDB2ErrorCode(testError, -803)).toBe(true);
     expect(isDB2ErrorCode(testError, -804)).toBe(false);
     expect(isRetryableError(testError)).toBe(false);
-    
+
     const errorJSON = testError.toJSON();
     expect(errorJSON.name).toBe('DB2Error');
     expect(errorJSON.errorType).toBe('DUPLICATE_KEY');
@@ -68,7 +68,7 @@ describe('DB2 Error Handling Module', () => {
   test('should handle non-DB2 errors by returning them unchanged', () => {
     const regularError = new Error('Regular JavaScript error');
     const result = handleDB2Error(regularError);
-    
+
     expect(result).toBe(regularError);
     expect(result).not.toBeInstanceOf(DB2Error);
   });
@@ -85,7 +85,7 @@ describe('DB2 Error Handling Module', () => {
     authErrors.forEach(({ sqlcode, expected }) => {
       const error = { message: 'Auth error', sqlcode };
       const enhanced = handleDB2Error(error);
-      
+
       expect(enhanced.errorType).toBe(expected);
       expect(enhanced.errorCategory).toBe('AUTHORIZATION');
     });

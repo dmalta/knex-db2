@@ -55,7 +55,7 @@ describe('Main Index Exports', () => {
     expect(knexDb2.ERROR_CATEGORY.TRANSACTION).toBe('TRANSACTION');
     expect(knexDb2.ERROR_CATEGORY.RESOURCE).toBe('RESOURCE');
     expect(knexDb2.ERROR_CATEGORY.UNKNOWN).toBe('UNKNOWN');
-    
+
     // Verify it's frozen (immutable)
     expect(Object.isFrozen(knexDb2.ERROR_CATEGORY)).toBe(true);
   });
