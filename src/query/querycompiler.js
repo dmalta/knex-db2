@@ -6,19 +6,19 @@ class Db2QueryCompiler extends QueryCompiler {
   }
 
   // DB2 specific query compilation methods
-  
+
   // Override limit/offset for DB2 syntax
   limit() {
     const noLimit = !this.single.limit && this.single.limit !== 0;
     if (noLimit) return '';
-    
+
     return `fetch first ${this.single.limit} rows only`;
   }
 
   offset() {
     const noOffset = !this.single.offset;
     if (noOffset) return '';
-    
+
     return `offset ${this.single.offset} rows`;
   }
 
@@ -26,7 +26,7 @@ class Db2QueryCompiler extends QueryCompiler {
   with() {
     const withs = this.grouped.with;
     if (!withs) return '';
-    
+
     return 'with ' + withs.map(w => w.sql).join(', ');
   }
 
@@ -40,7 +40,7 @@ class Db2QueryCompiler extends QueryCompiler {
   insert() {
     let sql = super.insert();
     if (sql === '') return sql;
-    
+
     // Handle VALUES clause properly for DB2
     return sql;
   }

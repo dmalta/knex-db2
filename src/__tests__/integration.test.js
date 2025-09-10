@@ -11,7 +11,7 @@ const PIMS_CONFIG = {
   pwd: 'VCKDTCW9'
 };
 
-const TABLESPACE = 'DSQDBDEF.DSQTSDEF';
+// const TABLESPACE = 'DSQDBDEF.DSQTSDEF'; // For future DDL operations
 
 describe('DB2 PIMS Integration Tests', () => {
   let db;
@@ -64,10 +64,10 @@ describe('DB2 PIMS Integration Tests', () => {
         AND TYPE = 'T'
         FETCH FIRST 5 ROWS ONLY
       `);
-      
+
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
-      
+
       if (result.length > 0) {
         // Check that we can access column metadata
         const firstRow = result[0];
@@ -93,7 +93,7 @@ describe('DB2 PIMS Integration Tests', () => {
       const compiled = query.toSQL();
       expect(compiled.sql).toContain('fetch first 3 rows only');
       expect(compiled.sql).toContain('"TABNAME"');
-      
+
       const result = await query;
       expect(Array.isArray(result)).toBe(true);
     } catch (error) {
@@ -110,10 +110,10 @@ describe('DB2 PIMS Integration Tests', () => {
         FROM SYSCAT.TABLES 
         WHERE TABSCHEMA = ?
       `, [schemaName]);
-      
+
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
-      
+
       if (result.length > 0) {
         expect(result[0]).toHaveProperty('TABLE_COUNT');
         expect(typeof result[0].TABLE_COUNT).toBe('number');

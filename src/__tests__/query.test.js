@@ -7,7 +7,7 @@ const PIMS_CONFIG = {
   pwd: 'VCKDTCW9'
 };
 
-const TABLESPACE = 'DSQDBDEF.DSQTSDEF';
+// const TABLESPACE = 'DSQDBDEF.DSQTSDEF'; // For future DDL operations
 
 const Db2Client = require('../client');
 
@@ -15,9 +15,9 @@ describe('DB2 Query Tests', () => {
   let client;
 
   beforeAll(() => {
-    client = new Db2Client({ 
-      client: 'db2', 
-      connection: PIMS_CONFIG 
+    client = new Db2Client({
+      client: 'db2',
+      connection: PIMS_CONFIG
     });
   });
 
@@ -43,7 +43,7 @@ describe('DB2 Query Tests', () => {
       .select('*')
       .from('test_table')
       .limit(5);
-    
+
     const compiled = query.toSQL();
     expect(compiled.sql).toContain('fetch first 5 rows only');
   });
@@ -54,7 +54,7 @@ describe('DB2 Query Tests', () => {
       .from('test_table')
       .offset(10)
       .limit(5);
-    
+
     const compiled = query.toSQL();
     expect(compiled.sql).toContain('offset 10 rows');
     expect(compiled.sql).toContain('fetch first 5 rows only');
@@ -65,7 +65,7 @@ describe('DB2 Query Tests', () => {
       .select('id', 'name')
       .from('users')
       .where('active', 1);
-    
+
     const compiled = query.toSQL();
     expect(compiled.sql).toContain('select "id", "name" from "users"');
     expect(compiled.sql).toContain('where "active" = ?');

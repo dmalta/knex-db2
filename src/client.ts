@@ -1,15 +1,5 @@
 const Client = require('knex/lib/client');
-let db2;
-try {
-  db2 = require('ibm_db');
-} catch {
-  // Mock ibm_db for testing when native bindings aren't available
-  db2 = {
-    open: (connStr, callback) => {
-      callback(new Error('ibm_db native bindings not available - using mock'));
-    }
-  };
-}
+const db2 = require('ibm_db');
 const { Db2QueryCompiler: QueryCompilerImpl } = require('./query/querycompiler');
 const { Db2SchemaCompiler: SchemaCompilerImpl } = require('./schema/compiler');
 const { Db2TableCompiler: TableCompilerImpl } = require('./schema/tablecompiler');
@@ -18,7 +8,7 @@ const { Db2ColumnCompiler: ColumnCompilerImpl } = require('./schema/columncompil
 class Db2ClientImpl extends Client {
   constructor(config = {}) {
     super(config);
-
+    
     // Set dialect-specific properties
     this.driverName = 'db2';
   }
@@ -52,19 +42,19 @@ class Db2ClientImpl extends Client {
   // Get a raw connection for DB2
   acquireRawConnection() {
     const connectionSettings = this.connectionSettings;
-
+    
     return new Promise((resolve, reject) => {
       // Build DB2 connection string
       const connStr = `DATABASE=${connectionSettings.database};HOSTNAME=${connectionSettings.hostname};PORT=${connectionSettings.port};PROTOCOL=TCPIP;UID=${connectionSettings.uid};PWD=${connectionSettings.pwd};`;
-
+      
       db2.open(connStr, (err, connection) => {
         if (err) {
           return reject(err);
         }
-
+        
         // Set connection properties
         connection.__knex__disposed = false;
-
+        
         resolve(connection);
       });
     });
@@ -76,7 +66,7 @@ class Db2ClientImpl extends Client {
       if (connection.__knex__disposed) {
         return resolve();
       }
-
+      
       connection.close((err) => {
         if (err) {
           return reject(err);
@@ -117,14 +107,34 @@ class Db2ClientImpl extends Client {
   // Process query response
   processResponse(obj, runner) {
     if (obj == null) return;
-
-    const { response } = obj;
-    if (obj.output) return obj.output.call(runner, response);
-    if (obj.method === 'raw') return response;
-    if (Array.isArray(response)) {
-      return response;
+    
+    // Handle different response types
+    if (Array.isArray(obj)) {
+      return obj;
     }
-    return response;
+    
+    return obj;
+  }
+
+  // Execute query
+  _query(connection, obj) {
+    return new Promise((resolve, reject) => {
+      if (!obj.sql) {
+        return reject(new Error('The query is empty'));
+      }
+
+      const sql = obj.sql;
+      const bindings = obj.bindings || [];
+
+      connection.query(sql, bindings, (err, result) => {
+        if (err) {
+          return reject(err);
+        }
+        
+        obj.response = result;
+        resolve(obj);
+      });
+    });
   }
 }
 
