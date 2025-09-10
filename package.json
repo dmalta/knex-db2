@@ -2,16 +2,14 @@
   "name": "knex-db2",
   "version": "0.1.0",
   "description": "A Knex.js client for IBM Db2 for z/OS",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
   "scripts": {
-    "build": "tsc",
     "test": "jest",
     "test:watch": "jest --watch",
-    "dev": "tsc --watch",
-    "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix",
-    "prepare": "npm run build"
+    "test:integration": "jest --testPathPattern=integration",
+    "lint": "eslint src/**/*.js",
+    "lint:fix": "eslint src/**/*.js --fix"
   },
   "keywords": [
     "knex",

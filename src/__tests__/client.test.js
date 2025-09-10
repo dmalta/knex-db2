@@ -19,9 +19,4 @@ describe('Db2Client', () => {
     const sql = 'SELECT * FROM table WHERE id = ? AND name = ?';
     expect(client.positionBindings(sql)).toBe(sql);
   });
-
-  test('should throw error for unimplemented connection', async () => {
-    const client = new Db2ClientTest({ client: 'db2', connection: {} });
-    await expect(client.acquireRawConnection()).rejects.toThrow('DB2 connection not yet implemented');
-  });
 });
