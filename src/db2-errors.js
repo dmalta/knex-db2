@@ -97,41 +97,57 @@ const DB2_ERROR_MAP = {
 };
 
 /**
+ * Error category enumeration
+ */
+const ERROR_CATEGORY = Object.freeze({
+  CONNECTION: 'CONNECTION',
+  AUTHENTICATION: 'AUTHENTICATION',
+  AUTHORIZATION: 'AUTHORIZATION',
+  SYNTAX: 'SYNTAX',
+  SCHEMA: 'SCHEMA',
+  DATA: 'DATA',
+  CONSTRAINT: 'CONSTRAINT',
+  TRANSACTION: 'TRANSACTION',
+  RESOURCE: 'RESOURCE',
+  UNKNOWN: 'UNKNOWN'
+});
+
+/**
  * Error categories for grouping related error types
  */
 const ERROR_CATEGORIES = {
-  CONNECTION: ['CONNECTION_FAILED', 'HOST_NOT_FOUND', 'COMMUNICATION_ERROR', 'DATABASE_NOT_FOUND'],
-  AUTHENTICATION: ['AUTHENTICATION_FAILED', 'INVALID_CREDENTIALS'],
-  AUTHORIZATION: [
+  [ERROR_CATEGORY.CONNECTION]: ['CONNECTION_FAILED', 'HOST_NOT_FOUND', 'COMMUNICATION_ERROR', 'DATABASE_NOT_FOUND'],
+  [ERROR_CATEGORY.AUTHENTICATION]: ['AUTHENTICATION_FAILED', 'INVALID_CREDENTIALS'],
+  [ERROR_CATEGORY.AUTHORIZATION]: [
     'INSUFFICIENT_PRIVILEGES', 'AUTHORIZATION_FAILURE', 'AUTHORIZATION_NAME_INVALID',
     'CANNOT_GRANT_PRIVILEGE', 'CANNOT_REVOKE_PRIVILEGE', 'REVOKE_NOT_AUTHORIZED',
     'PRIVILEGE_NOT_GRANTED', 'INVALID_AUTHORIZATION', 'GRANT_NOT_ALLOWED',
     'BIND_AUTHORIZATION_FAILURE', 'AUTHORIZATION_REQUIRED'
   ],
-  SYNTAX: [
+  [ERROR_CATEGORY.SYNTAX]: [
     'SYNTAX_ERROR', 'STATEMENT_TOO_LONG', 'STRING_CONSTANT_TOO_LONG',
     'INVALID_NUMERIC_LITERAL', 'INVALID_STRING_CONSTANT', 'OBJECT_NAME_TOO_LONG',
     'INVALID_NAME', 'CLAUSE_NOT_PERMITTED', 'INVALID_HEXADECIMAL_CONSTANT',
     'INVALID_COLUMN_FUNCTION', 'OPERAND_NOT_COLUMN_FUNCTION', 'INVALID_CHARACTER',
     'PREDICATE_NOT_VALID', 'WRONG_NUMBER_OF_VALUES', 'ORDER_BY_NOT_VALID'
   ],
-  SCHEMA: [
+  [ERROR_CATEGORY.SCHEMA]: [
     'OBJECT_NOT_FOUND', 'COLUMN_NOT_FOUND', 'AMBIGUOUS_COLUMN_REFERENCE',
     'COLUMN_NOT_FOUND_IN_TABLE', 'ORDER_BY_COLUMN_NOT_SELECTED'
   ],
-  DATA: [
+  [ERROR_CATEGORY.DATA]: [
     'INPUT_VALUE_TOO_LONG', 'CONVERSION_ERROR', 'NULL_VALUE_NOT_ALLOWED',
     'INVALID_DATA_TYPE', 'OVERFLOW_ERROR', 'CHARACTER_CONVERSION_ERROR'
   ],
-  CONSTRAINT: [
+  [ERROR_CATEGORY.CONSTRAINT]: [
     'FOREIGN_KEY_VIOLATION', 'PARENT_KEY_IN_CHILD_TABLE', 'DELETE_RESTRICT_VIOLATION',
     'DUPLICATE_KEY'
   ],
-  TRANSACTION: [
+  [ERROR_CATEGORY.TRANSACTION]: [
     'LOCK_TIMEOUT', 'DEADLOCK_DETECTED', 'BIND_ERROR', 'OBJECT_DELETED',
     'OBJECT_DROPPED'
   ],
-  RESOURCE: [
+  [ERROR_CATEGORY.RESOURCE]: [
     'RESOURCE_UNAVAILABLE', 'TABLESPACE_FULL', 'TABLESPACE_NOT_AVAILABLE'
   ]
 };
@@ -142,7 +158,7 @@ const ERROR_CATEGORIES = {
 class DB2Error extends Error {
   constructor(originalError, sql = null, bindings = null) {
     super(originalError.message);
-    
+
     this.name = 'DB2Error';
     this.sqlCode = originalError.sqlcode || originalError.code;
     this.sqlState = originalError.state || originalError.sqlstate;
@@ -174,7 +190,7 @@ class DB2Error extends Error {
    * Check if error is retryable (connection/resource issues)
    */
   isRetryable() {
-    const retryableCategories = ['CONNECTION', 'RESOURCE', 'TRANSACTION'];
+    const retryableCategories = [ERROR_CATEGORY.CONNECTION, ERROR_CATEGORY.RESOURCE, ERROR_CATEGORY.TRANSACTION];
     const retryableTypes = ['LOCK_TIMEOUT', 'DEADLOCK_DETECTED', 'RESOURCE_UNAVAILABLE'];
 
     return retryableCategories.includes(this.errorCategory) ||
@@ -238,7 +254,7 @@ function getErrorCategory(errorType) {
       return category;
     }
   }
-  return 'UNKNOWN';
+  return ERROR_CATEGORY.UNKNOWN;
 }
 
 /**
@@ -270,19 +286,20 @@ function isRetryableError(error) {
   if (error instanceof DB2Error) {
     return error.isRetryable();
   }
-  
+
   const sqlCode = error.sqlCode || error.sqlcode || error.code;
   const errorType = getErrorType(sqlCode);
   const errorCategory = getErrorCategory(errorType);
-  
-  const retryableCategories = ['CONNECTION', 'RESOURCE', 'TRANSACTION'];
+
+  const retryableCategories = [ERROR_CATEGORY.CONNECTION, ERROR_CATEGORY.RESOURCE, ERROR_CATEGORY.TRANSACTION];
   const retryableTypes = ['LOCK_TIMEOUT', 'DEADLOCK_DETECTED', 'RESOURCE_UNAVAILABLE'];
-  
+
   return retryableCategories.includes(errorCategory) || retryableTypes.includes(errorType);
 }
 
 module.exports = {
   DB2_ERROR_MAP,
+  ERROR_CATEGORY,
   ERROR_CATEGORIES,
   DB2Error,
   handleDB2Error,
