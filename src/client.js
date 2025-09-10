@@ -11,8 +11,6 @@ try {
   };
 }
 const { Db2QueryCompiler } = require('./query/db2-querycompiler');
-const { Db2SchemaCompiler } = require('./schema/db2-compiler');
-const { Db2TableCompiler } = require('./schema/db2-tablecompiler');
 const { Db2ColumnCompiler } = require('./schema/db2-columncompiler');
 const { handleDB2Error, DB2_ERROR_MAP } = require('./db2-errors');
 
@@ -34,11 +32,15 @@ class Db2Client extends Client {
   }
 
   schemaCompiler() {
-    return new Db2SchemaCompiler(this, ...arguments);
+    // TODO: Implement DB2-specific schema compiler for future refinements
+    // such as DB2-specific DDL syntax, constraints, and schema operations
+    return super.schemaCompiler(...arguments);
   }
 
   tableCompiler() {
-    return new Db2TableCompiler(this, ...arguments);
+    // TODO: Implement DB2-specific table compiler for future refinements
+    // such as DB2-specific table options, partitioning, and storage parameters
+    return super.tableCompiler(...arguments);
   }
 
   columnCompiler() {
