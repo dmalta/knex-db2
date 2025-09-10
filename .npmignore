@@ -1,0 +1,57 @@
+# Development files
+.github/
+docs/
+__tests__/
+src/__tests__/
+*.test.js
+*.spec.js
+.eslintrc*
+eslint.config.js
+jest.config.js
+.prettierrc*
+prettier.config.js
+
+# Build files
+tsconfig.json
+*.tsbuildinfo
+
+# Environment files
+.env*
+.DS_Store
+Thumbs.db
+
+# Version control
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Package managers
+node_modules/
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
+
+# Testing
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+logs/
+
+# Runtime
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Temporary files
+.tmp/
+temp/
