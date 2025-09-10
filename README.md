@@ -2,6 +2,11 @@
 
 A Knex.js client adapter for IBM DB2 for z/OS database connections.
 
+## Documentation
+
+- **[Windows DB2 Client Setup Guide](./docs/windows-db2-client-setup.md)** - Complete guide for setting up IBM DB2 client and building native bindings on Windows
+- **[Troubleshooting Checklist](./docs/troubleshooting-checklist.md)** - Quick reference for resolving common build and connection issues
+
 ## Overview
 
 This package provides a database client adapter that extends Knex.js to support IBM DB2 for z/OS. It implements the core Knex interfaces including query compilation, schema compilation, and connection management specifically tailored for DB2's SQL dialect and z/OS environment requirements.
@@ -11,6 +16,7 @@ This package provides a database client adapter that extends Knex.js to support 
 After investigating the existing Knex clients (PostgreSQL, MySQL, SQLite, Oracle, etc.), the following core components are required for any database client:
 
 ### Core Components
+
 1. **Client** - Main client class extending `knex/lib/client`
 2. **QueryCompiler** - Compiles query builder operations to SQL
 3. **SchemaCompiler** - Compiles schema operations
@@ -21,6 +27,7 @@ After investigating the existing Knex clients (PostgreSQL, MySQL, SQLite, Oracle
 ### Key Features Found in Existing Clients
 
 #### Universal Features (All Clients)
+
 - Connection management (`acquireRawConnection`, `destroyRawConnection`)
 - Identifier escaping (`wrapIdentifierImpl`)
 - Query compilation with dialect-specific SQL
@@ -29,6 +36,7 @@ After investigating the existing Knex clients (PostgreSQL, MySQL, SQLite, Oracle
 - Parameter binding handling
 
 #### Database-Specific Features
+
 - **PostgreSQL**: Search path, array support, RETURNING clause, CTEs
 - **MySQL**: Multiple insert syntax, ON DUPLICATE KEY, engine/charset
 - **SQLite**: Pragma handling, file-based connections
@@ -38,6 +46,7 @@ After investigating the existing Knex clients (PostgreSQL, MySQL, SQLite, Oracle
 ## Implementation Plan for DB2 Client
 
 ### Phase 1: Core Infrastructure ✅ (Completed)
+
 - [x] Basic client class structure
 - [x] Query compiler with DB2-specific SQL syntax
 - [x] Schema compiler foundation
@@ -46,6 +55,7 @@ After investigating the existing Knex clients (PostgreSQL, MySQL, SQLite, Oracle
 - [x] Basic test suite
 
 ### Phase 2: DB2-Specific Features (Next)
+
 - [ ] DB2 connection implementation using `ibm_db` driver
 - [ ] DB2 SQL dialect specifics:
   - [ ] `FETCH FIRST n ROWS ONLY` for LIMIT
@@ -59,17 +69,21 @@ After investigating the existing Knex clients (PostgreSQL, MySQL, SQLite, Oracle
   - [ ] Decimal precision handling
 
 ### Phase 3: Advanced Features (Future)
+
 - [ ] Transaction support
 - [ ] Connection pooling optimization
 - [ ] DB2 catalog queries for introspection
+<!-- IGORE:
 - [ ] Migration support
 - [ ] Sequence support
 - [ ] Stored procedure calling
-- [ ] DB2 z/OS specific features (CCSID, etc.)
+- [ ] DB2 z/OS specific features (CCSID, etc.) 
+-->
 
 ## Features Implemented
 
 ### ✅ Current Features
+
 - Basic client instantiation
 - Identifier wrapping with double quotes (`"identifier"`)
 - Basic query compilation structure
@@ -82,11 +96,13 @@ After investigating the existing Knex clients (PostgreSQL, MySQL, SQLite, Oracle
   - `json()` → `CLOB` (stored as text)
 
 ### 🚧 Partially Implemented
+
 - Query compiler (basic structure, needs DB2 SQL specifics)
 - Schema compiler (foundation only)
 - Connection management (interface only, needs actual DB2 driver)
 
 ### ❌ Not Yet Implemented
+
 - Actual DB2 database connectivity
 - Complex query features (joins, subqueries, CTEs)
 - Migration system integration
@@ -97,6 +113,7 @@ After investigating the existing Knex clients (PostgreSQL, MySQL, SQLite, Oracle
 ## Features Left Out (and Why)
 
 ### Intentionally Excluded
+
 1. **Multiple DB2 variants** - Focusing only on DB2 for z/OS initially
 2. **Legacy DB2 versions** - Targeting modern DB2 z/OS versions only
 3. **Advanced z/OS features** - CCSID, EBCDIC handling deferred to later
@@ -104,6 +121,7 @@ After investigating the existing Knex clients (PostgreSQL, MySQL, SQLite, Oracle
 5. **Advanced security** - SSL, Kerberos auth deferred to driver level
 
 ### Deferred to Future Versions
+
 1. **Connection pooling tuning** - Will use standard Knex pooling initially
 2. **Performance monitoring** - Not core to basic functionality
 3. **Bulk operations** - Complex optimization, not essential for MVP
@@ -112,12 +130,14 @@ After investigating the existing Knex clients (PostgreSQL, MySQL, SQLite, Oracle
 ## DB2 for z/OS Specific Considerations
 
 ### SQL Dialect Differences
+
 - Uses `FETCH FIRST n ROWS ONLY` instead of `LIMIT n`
 - Requires `OFFSET n ROWS` before `FETCH FIRST`
 - Double-quoted identifiers are case-sensitive
 - Parameter markers use `?` (similar to other databases)
 
 ### Data Type Mappings
+
 - `IDENTITY` columns for auto-increment (not `AUTO_INCREMENT`)
 - `CLOB` for large text (not `TEXT`)
 - `BLOB` for binary data
@@ -125,6 +145,7 @@ After investigating the existing Knex clients (PostgreSQL, MySQL, SQLite, Oracle
 - `TIMESTAMP` for datetime values
 
 ### Connection Requirements
+
 - Will use `ibm_db` Node.js driver
 - Requires DB2 client libraries on the system
 - Connection strings differ from other databases
@@ -157,6 +178,7 @@ const users = await knex('users').select('*');
 ## Development Status
 
 This is currently a **minimal working implementation** focused on:
+
 1. Proper integration with Knex architecture
 2. DB2-specific SQL generation
 3. Type-safe TypeScript implementation
@@ -167,6 +189,7 @@ The implementation prioritizes correctness and maintainability over advanced fea
 ## Contributing
 
 This project follows standard Knex client patterns. When adding features:
+
 1. Study existing client implementations in `node_modules/knex/lib/dialects/`
 2. Implement DB2-specific variations in the appropriate compiler
 3. Add comprehensive tests

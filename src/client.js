@@ -7,40 +7,33 @@ try {
   db2 = {
     open: (connStr, callback) => {
       callback(new Error('ibm_db native bindings not available - using mock'));
-    }
+    },
   };
 }
-const { Db2QueryCompiler: QueryCompilerImpl } = require('./query/querycompiler');
-const { Db2SchemaCompiler: SchemaCompilerImpl } = require('./schema/compiler');
-const { Db2TableCompiler: TableCompilerImpl } = require('./schema/tablecompiler');
-const { Db2ColumnCompiler: ColumnCompilerImpl } = require('./schema/columncompiler');
+const { Db2QueryCompiler } = require('./query/db2-querycompiler');
+const { Db2SchemaCompiler } = require('./schema/db2-compiler');
+const { Db2TableCompiler } = require('./schema/db2-tablecompiler');
+const { Db2ColumnCompiler } = require('./schema/db2-columncompiler');
 
-class Db2ClientImpl extends Client {
-  constructor(config = {}) {
-    super(config);
-
-    // Set dialect-specific properties
-    this.driverName = 'db2';
-  }
-
+class Db2Client extends Client {
   _driver() {
     return db2;
   }
 
   queryCompiler(builder, formatter) {
-    return new QueryCompilerImpl(this, builder, formatter);
+    return new Db2QueryCompiler(this, builder, formatter);
   }
 
   schemaCompiler() {
-    return new SchemaCompilerImpl(this, ...arguments);
+    return new Db2SchemaCompiler(this, ...arguments);
   }
 
   tableCompiler() {
-    return new TableCompilerImpl(this, ...arguments);
+    return new Db2TableCompiler(this, ...arguments);
   }
 
   columnCompiler() {
-    return new ColumnCompilerImpl(this, ...arguments);
+    return new Db2ColumnCompiler(this, ...arguments);
   }
 
   wrapIdentifierImpl(value) {
@@ -49,37 +42,153 @@ class Db2ClientImpl extends Client {
     return `"${value.replace(/"/g, '""')}"`;
   }
 
-  // Get a raw connection for DB2
+  // DB2 Error Code Mapping
+  getErrorMap() {
+    return {
+      // Connection errors
+      '-30081': 'CONNECTION_FAILED',
+      '-30082': 'CONNECTION_TIMEOUT',
+      '-1024': 'DATABASE_NOT_FOUND',
+
+      // Authentication errors
+      '-1403': 'INVALID_CREDENTIALS',
+      '-551': 'INSUFFICIENT_PRIVILEGES',
+
+      // SQL errors
+      '-104': 'SYNTAX_ERROR',
+      '-199': 'SYNTAX_ERROR', // Illegal use of reserved word
+      '-204': 'OBJECT_NOT_FOUND',
+      '-206': 'COLUMN_NOT_FOUND',
+      '-407': 'NULL_VALUE_NOT_ALLOWED',
+      '-530': 'FOREIGN_KEY_VIOLATION',
+      '-803': 'DUPLICATE_KEY',
+
+      // Transaction errors
+      '-913': 'DEADLOCK_DETECTED',
+      '-911': 'LOCK_TIMEOUT',
+
+      // Resource errors
+      '-289': 'TABLESPACE_FULL',
+      '-904': 'RESOURCE_UNAVAILABLE',
+    };
+  }
+
+  // Enhanced error handling
+  handleError(error) {
+    if (!error.sqlcode && !error.state) {
+      return error; // Not a DB2 error
+    }
+
+    const errorMap = this.getErrorMap();
+    const sqlCode = error.sqlcode || error.code;
+    const errorType = errorMap[sqlCode] || 'UNKNOWN_ERROR';
+
+    // Create enhanced error object
+    const enhancedError = new Error(error.message);
+    enhancedError.name = 'DB2Error';
+    enhancedError.sqlCode = sqlCode;
+    enhancedError.sqlState = error.state;
+    enhancedError.errorType = errorType;
+    enhancedError.originalError = error;
+
+    return enhancedError;
+  }
+
+  // Get a raw connection for DB2 with enhanced error handling
   acquireRawConnection() {
-    const connectionSettings = this.connectionSettings;
+    // Use this.config.connection directly to ensure we get all fields including password
+    const connectionSettings = this.config.connection;
 
     return new Promise((resolve, reject) => {
-      // Build DB2 connection string
-      const connStr = `DATABASE=${connectionSettings.database};HOSTNAME=${connectionSettings.hostname};PORT=${connectionSettings.port};PROTOCOL=TCPIP;UID=${connectionSettings.uid};PWD=${connectionSettings.pwd};`;
+      try {
+        // Build DB2 connection string with additional options
+        const connStr = this.buildConnectionString(connectionSettings);
 
-      db2.open(connStr, (err, connection) => {
-        if (err) {
-          return reject(err);
+        const connectionTimeout = connectionSettings.connectionTimeout || 10000;
+        let timeoutHandle;
+
+        // Set connection timeout
+        if (connectionTimeout > 0) {
+          timeoutHandle = setTimeout(() => {
+            reject(new Error(`Connection timeout after ${connectionTimeout}ms`));
+          }, connectionTimeout);
         }
 
-        // Set connection properties
-        connection.__knex__disposed = false;
+        db2.open(connStr, (err, connection) => {
+          if (timeoutHandle) clearTimeout(timeoutHandle);
 
-        resolve(connection);
-      });
+          if (err) {
+            const enhancedError = this.handleError(err);
+            return reject(enhancedError);
+          }
+
+          // Set connection properties for pooling
+          connection.__knex__disposed = false;
+          connection.__knex__acquired = new Date();
+          connection.__knex__db2_client = this;
+
+          // Set connection-level options
+          this.setConnectionOptions(connection);
+
+          resolve(connection);
+        });
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
-  // Close DB2 connection
+  // Build DB2 connection string with all options
+  buildConnectionString(settings) {
+    const options = [
+      'DRIVER=IBM DB2 ODBC DRIVER',
+      `DATABASE=${settings.database}`,
+      `HOSTNAME=${settings.hostname}`,
+      `PORT=${settings.port || 50000}`,
+      'PROTOCOL=TCPIP',
+      `UID=${settings.user || settings.uid}`,
+      `PWD=${settings.password || settings.pwd}`,
+    ];
+
+    // Add optional connection parameters
+    if (settings.schema) options.push(`CURRENTSCHEMA=${settings.schema}`);
+    if (settings.connectTimeout) options.push(`CONNECTTIMEOUT=${settings.connectTimeout}`);
+    if (settings.queryTimeout) options.push(`QUERYTIMEOUT=${settings.queryTimeout}`);
+    if (settings.security === 'SSL') options.push('SECURITY=SSL');
+
+    return options.join(';') + ';';
+  }
+
+  // Set DB2-specific connection options
+  setConnectionOptions(connection) {
+    // Set autocommit mode (default: true for Knex compatibility)
+    const autocommit = this.config.connection?.autocommit !== false;
+
+    // Note: ibm_db handles autocommit differently, this is a placeholder
+    // for when we need to set specific DB2 connection attributes
+    connection.__knex__autocommit = autocommit;
+  }
+
+  // Enhanced connection closing with proper cleanup
   async destroyRawConnection(connection) {
     return new Promise((resolve, reject) => {
       if (connection.__knex__disposed) {
         return resolve();
       }
 
+      // Mark as disposed immediately to prevent reuse
+      connection.__knex__disposed = true;
+
+      // Close with timeout
+      const closeTimeout = setTimeout(() => {
+        reject(new Error('Connection close timeout'));
+      }, 5000);
+
       connection.close((err) => {
+        clearTimeout(closeTimeout);
         if (err) {
-          return reject(err);
+          const enhancedError = this.handleError(err);
+          return reject(enhancedError);
         }
         resolve();
       });
@@ -87,26 +196,62 @@ class Db2ClientImpl extends Client {
   }
 
   validateConnection(connection) {
-    return connection && !connection.__knex__disposed;
+    if (!connection || connection.__knex__disposed) {
+      return Promise.resolve(false);
+    }
+
+    // Check if connection has required DB2 methods
+    if (typeof connection.query !== 'function' || typeof connection.close !== 'function') {
+      return Promise.resolve(false);
+    }
+
+    // Additional DB2-specific validation
+    // Check if connection is still active (ibm_db specific)
+    if (connection.connected !== undefined && !connection.connected) {
+      return Promise.resolve(false);
+    }
+
+    // Execute SYSDUMMY1 query to validate connection is working
+    return new Promise((resolve) => {
+      connection.query('SELECT 1 AS test FROM SYSIBM.SYSDUMMY1', [], (err, result) => {
+        if (err) {
+          resolve(false);
+        } else {
+          // Validate we got a result array with at least one row
+          resolve(result && Array.isArray(result) && result.length > 0);
+        }
+      });
+    });
   }
 
-  // DB2 uses parameter markers (?) for prepared statements
-  positionBindings(sql) {
-    return sql;
-  }
-
-  // Execute query using DB2
-  _query(connection, obj) {
+  // Execute query using DB2 with enhanced error handling
+  query(connection, obj) {
     if (!obj.sql) throw new Error('The query is empty');
 
     return new Promise((resolve, reject) => {
+      const queryTimeout = this.config.connection?.queryTimeout || 30000;
+      let timeoutHandle;
+
+      // Set query timeout
+      if (queryTimeout > 0) {
+        timeoutHandle = setTimeout(() => {
+          reject(new Error(`Query timeout after ${queryTimeout}ms: ${obj.sql.substring(0, 100)}...`));
+        }, queryTimeout);
+      }
+
       connection.query(obj.sql, obj.bindings || [], (err, result, moreResultSets) => {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+
         if (err) {
-          reject(err);
+          const enhancedError = this.handleError(err);
+          enhancedError.sql = obj.sql;
+          enhancedError.bindings = obj.bindings;
+          reject(enhancedError);
         } else {
           const response = {
             response: result || [],
-            moreResultSets: moreResultSets
+            moreResultSets: moreResultSets,
+            rowCount: Array.isArray(result) ? result.length : 0,
           };
           resolve(response);
         }
@@ -114,18 +259,43 @@ class Db2ClientImpl extends Client {
     });
   }
 
-  // Process query response
+  // Process the response as returned from the query
   processResponse(obj, runner) {
     if (obj == null) return;
+    let { response } = obj;
+    const { method } = obj;
 
-    const { response } = obj;
-    if (obj.output) return obj.output.call(runner, response);
-    if (obj.method === 'raw') return response;
-    if (Array.isArray(response)) {
-      return response;
+    if (obj.output) {
+      return obj.output.call(runner, response);
     }
-    return response;
+
+    // DB2 result processing - results are already in the correct format
+    // from ibm_db driver (array of objects)
+    switch (method) {
+      case 'select':
+        return response;
+      case 'first':
+        return response[0];
+      case 'pluck':
+        return response.map((row) => row[obj.pluck]);
+      case 'insert':
+      case 'del':
+      case 'update':
+      case 'counter':
+        if (obj.returning) {
+          return response;
+        }
+        return obj.rowCount || 0;
+      default:
+        return response;
+    }
   }
 }
 
-module.exports = Db2ClientImpl;
+// Set static properties on the client prototype
+Object.assign(Db2Client.prototype, {
+  dialect: 'db2',
+  driverName: 'db2',
+});
+
+module.exports = Db2Client;

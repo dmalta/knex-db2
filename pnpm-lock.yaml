@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       ibm_db:
-        specifier: ^3.3.3
-        version: 3.3.3
+        specifier: 3.3.2
+        version: 3.3.2
       knex:
         specifier: ^2.0.0 || ^3.0.0
         version: 3.1.0
@@ -30,9 +30,15 @@ importers:
       eslint:
         specifier: ^9.35.0
         version: 9.35.0
+      eslint-config-prettier:
+        specifier: ^10.1.8
+        version: 10.1.8(eslint@9.35.0)
       jest:
         specifier: ^30.1.3
         version: 30.1.3(@types/node@24.3.1)
+      prettier:
+        specifier: ^3.6.2
+        version: 3.6.2
       ts-jest:
         specifier: ^29.1.0
         version: 29.4.1(@babel/core@7.28.4)(@jest/transform@30.1.2)(@jest/types@30.0.5)(babel-jest@30.1.2(@babel/core@7.28.4))(jest-util@30.0.5)(jest@30.1.3(@types/node@24.3.1))(typescript@5.9.2)
@@ -933,6 +939,12 @@ packages:
     resolution: {integrity: sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA==}
     engines: {node: '>=10'}
 
+  eslint-config-prettier@10.1.8:
+    resolution: {integrity: sha512-82GZUjRS0p/jganf6q1rEO25VSoHH0hKPCTrgillPjdI/3bgBhAE1QzHrHTizjpRvy6pGAvKjDJtk2pF9NDq8w==}
+    hasBin: true
+    peerDependencies:
+      eslint: '>=7.0.0'
+
   eslint-scope@8.4.0:
     resolution: {integrity: sha512-sNXOfKCn74rt8RICKMvJS7XKV/Xk9kA7DyJr8mJik3S7Cwgy3qlkkmyS2uQB3jiJg6VNdZd/pDBJu0nvG2NlTg==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
@@ -1168,8 +1180,8 @@ packages:
     resolution: {integrity: sha512-B4FFZ6q/T2jhhksgkbEW3HBvWIfDW85snkQgawt07S7J5QXTk6BkNV+0yAeZrM5QpMAdYlocGoljn0sJ/WQkFw==}
     engines: {node: '>=10.17.0'}
 
-  ibm_db@3.3.3:
-    resolution: {integrity: sha512-/aB2YtOSixalf2FZ1edRRlH+GKw+KnBBXUUmcW2XCoKCVIEf4Jt9n+H2jDqH6/2G/GSPg3gkDK3cMG/WIc1gcQ==}
+  ibm_db@3.3.2:
+    resolution: {integrity: sha512-cfdlzpZVMyz4+23+X34wTIbT/nRz3BKO/F1uy8zeAcZblM5OvQNFQ3pGyRVc4PH7RJN21STFCC/18RctpM7sAg==}
     engines: {node: '>=6.0'}
 
   ignore@5.3.2:
@@ -1683,6 +1695,11 @@ packages:
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
+
+  prettier@3.6.2:
+    resolution: {integrity: sha512-I7AIg5boAr5R0FFtJ6rCfD+LFsWHp81dolrFD8S79U9tb8Az2nGrJncnMSnys+bpQJfRUzqs9hnA81OAA3hCuQ==}
+    engines: {node: '>=14'}
+    hasBin: true
 
   pretty-format@30.0.5:
     resolution: {integrity: sha512-D1tKtYvByrBkFLe2wHJl2bwMJIiT8rW+XA+TiataH79/FszLQMrpGEvzUVkzPau7OCO0Qnrhpe87PqtOAIB8Yw==}
@@ -3067,6 +3084,10 @@ snapshots:
 
   escape-string-regexp@4.0.0: {}
 
+  eslint-config-prettier@10.1.8(eslint@9.35.0):
+    dependencies:
+      eslint: 9.35.0
+
   eslint-scope@8.4.0:
     dependencies:
       esrecurse: 4.3.0
@@ -3335,7 +3356,7 @@ snapshots:
 
   human-signals@2.1.0: {}
 
-  ibm_db@3.3.3:
+  ibm_db@3.3.2:
     dependencies:
       adm-zip: 0.5.16
       axios: 1.11.0
@@ -3980,6 +4001,8 @@ snapshots:
   possible-typed-array-names@1.1.0: {}
 
   prelude-ls@1.2.1: {}
+
+  prettier@3.6.2: {}
 
   pretty-format@30.0.5:
     dependencies:

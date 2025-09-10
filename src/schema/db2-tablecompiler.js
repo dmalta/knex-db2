@@ -1,11 +1,8 @@
 const TableCompiler = require('knex/lib/schema/tablecompiler');
 
 class Db2TableCompiler extends TableCompiler {
-  constructor(client, tableBuilder) {
-    super(client, tableBuilder);
-  }
-
-  // DB2 specific table compilation methods will go here
+  // Inherits all default behavior from base TableCompiler
+  // Add DB2-specific table methods only when needed
 }
 
 module.exports = { Db2TableCompiler };
