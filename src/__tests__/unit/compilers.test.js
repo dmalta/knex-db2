@@ -122,4 +122,74 @@ describe('DB2 Compiler Unit Tests', () => {
       expect(compiled.bindings).toEqual([18, 'admin']);
     });
   });
+
+  describe('DB2-specific QueryCompiler overrides', () => {
+    const getSql = (compiled) =>
+      Array.isArray(compiled)
+        ? compiled.map((entry) => entry.sql || entry).join(' ')
+        : compiled.sql;
+
+    test('offset only wraps in ROW_NUMBER subquery', () => {
+      const sql = getSql(db.select('*').from('users').offset(10).toSQL());
+      expect(sql).toContain('ROW_NUMBER() OVER()');
+      expect(sql).toContain('rn__ >= 11');
+      expect(sql).not.toContain('OFFSET 10');
+    });
+
+    test('limit and offset use ROW_NUMBER bounds', () => {
+      const sql = getSql(db.select('*').from('users').limit(5).offset(10).toSQL());
+      expect(sql).toContain('ROW_NUMBER() OVER()');
+      expect(sql).toContain('rn__ >= 11');
+      expect(sql).toContain('rn__ <= 15');
+    });
+
+    test('limit without offset still uses FETCH FIRST', () => {
+      const sql = getSql(db.select('*').from('users').limit(5).toSQL());
+      expect(sql).toContain('fetch first 5 rows only');
+      expect(sql).not.toContain('ROW_NUMBER() OVER()');
+    });
+
+    test('truncate emits TRUNCATE TABLE ... IMMEDIATE', () => {
+      const sql = getSql(db('users').truncate().toSQL());
+      expect(sql).toMatch(/TRUNCATE TABLE users IMMEDIATE/i);
+    });
+
+    test('whereILike uses UPPER() around column and binding', () => {
+      const sql = getSql(db.select('*').from('users').whereILike('name', '%john%').toSQL());
+      expect(sql).toMatch(/UPPER\(name\) like UPPER\(\?\)/i);
+    });
+
+    test('forUpdate emits FOR UPDATE WITH RS', () => {
+      const sql = getSql(db.select('*').from('users').forUpdate().toSQL());
+      expect(sql).toContain('FOR UPDATE WITH RS');
+    });
+
+    test('forShare emits FOR FETCH ONLY', () => {
+      const sql = getSql(db.select('*').from('users').forShare().toSQL());
+      expect(sql).toContain('FOR FETCH ONLY');
+    });
+
+    test('recursive CTE does not duplicate WITH or emit RECURSIVE', () => {
+      const sql = getSql(
+        db
+          .withRecursive('cte', (builder) => builder.select('*').from('users'))
+          .select('*')
+          .from('cte')
+          .toSQL()
+      );
+      const withCount = (sql.match(/\bwith\b/gi) || []).length;
+      expect(withCount).toBe(1);
+      expect(sql).not.toMatch(/\brecursive\b/i);
+    });
+
+    test('columnInfo targets SYSIBM.SYSCOLUMNS and uppercases identifiers', () => {
+      const builder = db.queryBuilder().from('users').withSchema('app');
+      builder._single.columnInfo = null;
+      const compiler = db.client.queryCompiler(builder);
+      const info = compiler.columnInfo();
+
+      expect(info.sql).toContain('SYSIBM.SYSCOLUMNS');
+      expect(info.bindings).toEqual(['USERS', 'APP']);
+    });
+  });
 });
