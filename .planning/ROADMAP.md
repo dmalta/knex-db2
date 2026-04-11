@@ -23,7 +23,7 @@
 
 **Goal:** Achieve ≥80% (ideally ≥90%) coverage of critical code paths. Reconsider all existing tests for usefulness and value. Add unit and integration tests where coverage is missing.
 **Depends on:** Phase 03
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 **Requirements:**
 - COV-01: client.js connection lifecycle coverage ≥90% (acquireRawConnection, buildConnectionString optional params, destroyRawConnection, setConnectionOptions)
@@ -35,6 +35,6 @@
 - COV-07: db2-querycompiler.js coverage ≥90% (columnInfo output() named-key rows, array-style rows, resp.rows format, specific column lookup)
 
 Plans:
-- [ ] 04-01-PLAN.md — Extend client.test.js: connection lifecycle + query execution path gaps
-- [ ] 04-02-PLAN.md — Extend table-transaction.test.js: tablecompiler missing methods + transaction savepoints
-- [ ] 04-03-PLAN.md — Extend schema-compilers.test.js: schemacompiler/columncompiler/querycompiler edge cases
+- [x] 04-01-PLAN.md — Extend client.test.js: connection lifecycle + query execution path gaps
+- [x] 04-02-PLAN.md — Extend table-transaction.test.js: tablecompiler missing methods + transaction savepoints
+- [x] 04-03-PLAN.md — Extend schema-compilers.test.js: schemacompiler/columncompiler/querycompiler edge cases
