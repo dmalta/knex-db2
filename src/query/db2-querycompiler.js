@@ -115,10 +115,10 @@ class Db2QueryCompiler extends QueryCompiler {
         const out = rows.reduce((cols, row) => {
           // If the row acts like an array, we prefer numeric indices if we can't find NAME
           // In some z/OS environments row.NAME might be undefined but row[0] is correct
-          // However, we MUST check for both '0' (string key) and 0 (numeric index) 
+          // However, we MUST check for both '0' (string key) and 0 (numeric index)
           // to cover all driver result formats.
           const name = (row.NAME || row['NAME'] || row[0] || row['0'] || '').toString().trim();
-          
+
           if (name && isNaN(name)) {
             cols[name.toUpperCase()] = {
               type:         (row.COLTYPE || row['COLTYPE'] || row[1] || row['1'] || '').toString().trim(),
