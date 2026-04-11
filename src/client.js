@@ -273,6 +273,24 @@ class Db2Client extends Client {
           return obj;
         }
       }
+      if (obj.suppressIfExists) {
+        const code = execErr.sqlcode || execErr.code;
+        // -601: object already exists (table, index, view)
+        // -607: constraint name already in use
+        if (code === -601 || code === '-601' || code === -607 || code === '-607') {
+          obj.response = [];
+          obj.rowCount = 0;
+          return obj;
+        }
+      }
+      // SQL warnings (SQLSTATE class '01') are non-fatal — the DDL executed
+      // successfully on the server despite the driver surfacing a warning.
+      const sqlstate = String(execErr.state || execErr.sqlstate || '');
+      if (sqlstate.startsWith('01')) {
+        obj.response = [];
+        obj.rowCount = 0;
+        return obj;
+      }
       throw this.handleError(execErr, obj.sql, obj.bindings);
     } finally {
       try {
