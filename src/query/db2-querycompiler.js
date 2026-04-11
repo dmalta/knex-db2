@@ -118,11 +118,10 @@ class Db2QueryCompiler extends QueryCompiler {
       retCols.length === 1 && retCols[0] === '*' ? '*' : this.formatter.columnize(retCols);
 
     const baseSql = typeof base === 'string' ? base : base.sql;
-    const baseBindings = typeof base === 'string' ? [] : base.bindings || [];
 
     return {
       sql: `select ${cols} from final table (${baseSql})`,
-      bindings: baseBindings,
+      bindings: this.formatter.bindings,
     };
   }
 

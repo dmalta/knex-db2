@@ -76,6 +76,46 @@ describe('DB2 Compiler Unit Tests', () => {
           ],
         });
       });
+
+      describe('.returning() via SELECT FROM FINAL TABLE', () => {
+        test('single column string wraps insert in FINAL TABLE select', () => {
+          const compiled = db('users').insert({ name: 'John' }).returning('id').toSQL();
+          expect(compiled.sql).toBe(
+            'select id from final table (insert into users (name) values (?))'
+          );
+          expect(compiled.bindings).toEqual(['John']);
+        });
+
+        test('array of columns produces comma-separated column list', () => {
+          const compiled = db('users').insert({ name: 'John' }).returning(['id', 'name']).toSQL();
+          expect(compiled.sql).toBe(
+            'select id, name from final table (insert into users (name) values (?))'
+          );
+        });
+
+        test("returning('*') emits SELECT * FROM FINAL TABLE", () => {
+          const compiled = db('users').insert({ name: 'John' }).returning('*').toSQL();
+          expect(compiled.sql).toBe(
+            'select * from final table (insert into users (name) values (?))'
+          );
+        });
+
+        test("returning(['*']) also emits SELECT * FROM FINAL TABLE", () => {
+          const compiled = db('users').insert({ name: 'John' }).returning(['*']).toSQL();
+          expect(compiled.sql).toBe(
+            'select * from final table (insert into users (name) values (?))'
+          );
+        });
+
+        test('bulk insert + .returning() throws a clear error', () => {
+          expect(() => {
+            db('users')
+              .insert([{ name: 'John' }, { name: 'Jane' }])
+              .returning('id')
+              .toSQL();
+          }).toThrow(/bulk/i);
+        });
+      });
     });
 
     describe('UPDATE Queries', () => {
