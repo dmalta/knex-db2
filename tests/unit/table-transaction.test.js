@@ -1,7 +1,7 @@
 'use strict';
 const knex = require('knex');
-const Db2Client = require('../../client');
-const { Db2Transaction } = require('../../transaction');
+const Db2Client = require('../../src/client');
+const { Db2Transaction } = require('../../src/transaction');
 
 let db;
 beforeAll(() => {

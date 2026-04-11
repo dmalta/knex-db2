@@ -1,7 +1,7 @@
 // Unit tests for DB2 Query and Schema Compilers
 // These tests focus on basic SQL generation patterns
 const knex = require('knex');
-const Db2Client = require('../../client');
+const Db2Client = require('../../src/client');
 
 describe('DB2 Compiler Unit Tests', () => {
   let db;

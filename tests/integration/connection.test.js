@@ -1,7 +1,7 @@
 // Integration tests for DB2 connection management and basic operations
 // These tests require a real DB2 connection when DB2_REAL_TEST=true
 const knex = require('knex');
-const Db2Client = require('../../client');
+const Db2Client = require('../../src/client');
 const { DB_CONFIG, POOL_CONFIG, shouldRunRealTests, TEST_TIMEOUT } = require('../helpers/test-config');
 
 const runTests = shouldRunRealTests();

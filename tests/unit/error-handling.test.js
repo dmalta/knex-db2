@@ -1,5 +1,5 @@
 // Unit tests for DB2 error handling and mapping
-const Db2Client = require('../../client');
+const Db2Client = require('../../src/client');
 
 describe('DB2 Error Handling Unit Tests', () => {
   let client;

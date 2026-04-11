@@ -1,0 +1,9 @@
+{
+    "hostname": "mbgmvsc.pok.ibm.com",
+    "port": 3906,
+    "database": "DB2C",
+    "user": "PRESS",
+    "password": "V32C9vjg",
+    "tablespace": "DSQDBDEF.DSQTSDEF",
+    "$schema": "KNEXTEST"
+}

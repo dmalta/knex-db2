@@ -1,7 +1,7 @@
 // Integration tests for complex DB2 query operations
 // Tests query builder features, joins, aggregations, and advanced SQL
 const knex = require('knex');
-const Db2Client = require('../../client');
+const Db2Client = require('../../src/client');
 const { DB_CONFIG, POOL_CONFIG, shouldRunRealTests, TEST_TIMEOUT, TEST_TABLESPACE } = require('../helpers/test-config');
 
 const runTests = shouldRunRealTests();

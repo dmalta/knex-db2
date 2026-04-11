@@ -1,6 +1,6 @@
 // Unit tests for DB2 Client class
 // These tests do not require a real database connection
-const Db2Client = require('../../client');
+const Db2Client = require('../../src/client');
 
 describe('DB2 Client Unit Tests', () => {
   let client;

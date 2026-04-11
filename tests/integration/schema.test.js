@@ -1,7 +1,7 @@
 // Integration tests for DB2 schema operations (DDL)
 // Tests table creation, alteration, and schema introspection
 const knex = require('knex');
-const Db2Client = require('../../client');
+const Db2Client = require('../../src/client');
 const { DB_CONFIG, POOL_CONFIG, shouldRunRealTests, TEST_TIMEOUT } = require('../helpers/test-config');
 
 const runTests = shouldRunRealTests();

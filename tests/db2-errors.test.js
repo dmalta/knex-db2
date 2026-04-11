@@ -2,7 +2,7 @@
  * Test file for DB2 error handling functionality
  */
 
-const { handleDB2Error, isDB2ErrorCode, isRetryableError, DB2Error } = require('../db2-errors');
+const { handleDB2Error, isDB2ErrorCode, isRetryableError, DB2Error } = require('../src/db2-errors');
 
 describe('DB2 Error Handling Module', () => {
   test('should handle basic DB2 errors correctly', () => {

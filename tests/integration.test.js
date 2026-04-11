@@ -1,6 +1,6 @@
 // Integration test for DB2 PIMS connection
 const knex = require('knex');
-const Db2Client = require('../client');
+const Db2Client = require('../src/client');
 
 // Load DB2 connection config from JSON file
 let DB_CONFIG;
