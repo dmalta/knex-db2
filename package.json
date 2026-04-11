@@ -22,12 +22,12 @@
   },
   "homepage": "https://github.com/dmalta/knex-db2#readme",
   "scripts": {
-    "test": "jest",
-    "test:unit": "jest --testPathPatterns=unit",
-    "test:integration": "jest --testPathPatterns=integration",
-    "test:real": "DB2_REAL_TEST=true jest --testPathPatterns=integration",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
+    "test": "vitest run",
+    "test:unit": "vitest run unit",
+    "test:integration": "vitest run integration",
+    "test:real": "DB2_REAL_TEST=true vitest run integration",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "lint": "eslint src/**/*.js",
     "lint:fix": "eslint src/**/*.js --fix",
     "format": "prettier --write src/**/*.js",
@@ -45,12 +45,13 @@
   "author": "dmalta",
   "license": "MIT",
   "devDependencies": {
+    "@vitest/coverage-v8": "^3.0.0",
     "eslint": "^9.35.0",
     "eslint-config-prettier": "^10.1.8",
     "ibm_db": "^3.3.2",
-    "jest": "^30.1.3",
     "knex": "^3.1.0",
-    "prettier": "^3.6.2"
+    "prettier": "^3.6.2",
+    "vitest": "^3.0.0"
   },
   "peerDependencies": {
     "ibm_db": "3.3.2",

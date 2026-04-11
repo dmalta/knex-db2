@@ -137,20 +137,20 @@ describe('DB2 Client Unit Tests', () => {
       let capturedStmt;
       const conn = {
         __knex__disposed: false,
-        prepare: jest.fn((sql) => {
+        prepare: vi.fn((sql) => {
           capturedStmt = {
-            executeNonQuery: jest.fn((bindings) => Promise.resolve(dmlAffectedRows)),
-            execute: jest.fn((bindings) => Promise.resolve({
+            executeNonQuery: vi.fn((bindings) => Promise.resolve(dmlAffectedRows)),
+            execute: vi.fn((bindings) => Promise.resolve({
               fetchAllSync: () => [],
               getColumnMetadataSync: () => [],
-              closeSync: jest.fn(),
+              closeSync: vi.fn(),
             })),
-            closeSync: jest.fn(),
+            closeSync: vi.fn(),
           };
           return Promise.resolve(capturedStmt);
         }),
-        query: jest.fn(),
-        close: jest.fn(),
+        query: vi.fn(),
+        close: vi.fn(),
       };
       conn._getStmt = () => capturedStmt;
       return conn;
@@ -197,9 +197,9 @@ describe('DB2 Client Unit Tests', () => {
       const fakeReadable = new Readable({ objectMode: true, read() {} });
       const connection = {
         __knex__disposed: false,
-        queryStream: jest.fn(() => fakeReadable),
-        query: jest.fn(),
-        close: jest.fn(),
+        queryStream: vi.fn(() => fakeReadable),
+        query: vi.fn(),
+        close: vi.fn(),
       };
 
       const chunks = [];

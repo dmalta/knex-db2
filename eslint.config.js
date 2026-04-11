@@ -21,7 +21,7 @@ module.exports = [
         clearTimeout: 'readonly',
         setInterval: 'readonly',
         clearInterval: 'readonly',
-        // Jest globals
+        // Vitest globals
         describe: 'readonly',
         test: 'readonly',
         expect: 'readonly',
@@ -29,7 +29,7 @@ module.exports = [
         afterAll: 'readonly',
         beforeEach: 'readonly',
         afterEach: 'readonly',
-        jest: 'readonly',
+        vi: 'readonly',
       },
     },
     rules: {

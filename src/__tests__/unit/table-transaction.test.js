@@ -62,9 +62,9 @@ describe('Db2Transaction', () => {
 
   beforeEach(() => {
     mockConnection = {
-      beginTransaction:    jest.fn(() => Promise.resolve()),
-      commitTransaction:   jest.fn(() => Promise.resolve()),
-      rollbackTransaction: jest.fn(() => Promise.resolve()),
+      beginTransaction:    vi.fn(() => Promise.resolve()),
+      commitTransaction:   vi.fn(() => Promise.resolve()),
+      rollbackTransaction: vi.fn(() => Promise.resolve()),
     };
   });
 
@@ -87,26 +87,26 @@ describe('Db2Transaction', () => {
   });
 
   test('rollback() resolves with original error even when rollbackTransaction fails', async () => {
-    mockConnection.rollbackTransaction = jest.fn(() => Promise.reject(new Error('rollback failed')));
+    mockConnection.rollbackTransaction = vi.fn(() => Promise.reject(new Error('rollback failed')));
     const originalError = new Error('original');
     const result = await Db2Transaction.prototype.rollback.call(null, mockConnection, originalError);
     expect(result).toBe(originalError);
   });
 
   test('begin() rejects if beginTransaction returns error', async () => {
-    mockConnection.beginTransaction = jest.fn(() => Promise.reject(new Error('begin failed')));
+    mockConnection.beginTransaction = vi.fn(() => Promise.reject(new Error('begin failed')));
     await expect(Db2Transaction.prototype.begin.call(null, mockConnection)).rejects.toThrow('begin failed');
   });
 
   describe('setIsolationLevel', () => {
     test('does not call setIsolationLevel when not configured', async () => {
-      mockConnection.setIsolationLevel = jest.fn();
+      mockConnection.setIsolationLevel = vi.fn();
       await Db2Transaction.prototype.begin.call(null, mockConnection);
       expect(mockConnection.setIsolationLevel).not.toHaveBeenCalled();
     });
 
     test('calls setIsolationLevel with numeric level from client config', async () => {
-      mockConnection.setIsolationLevel = jest.fn();
+      mockConnection.setIsolationLevel = vi.fn();
       const ctx = { client: { config: { isolationLevel: 4 } } };
       await Db2Transaction.prototype.begin.call(ctx, mockConnection);
       expect(mockConnection.setIsolationLevel).toHaveBeenCalledWith(4);
@@ -114,14 +114,14 @@ describe('Db2Transaction', () => {
     });
 
     test('calls setIsolationLevel with string constant SERIALIZABLE', async () => {
-      mockConnection.setIsolationLevel = jest.fn();
+      mockConnection.setIsolationLevel = vi.fn();
       const ctx = { client: { config: { isolationLevel: 'SERIALIZABLE' } } };
       await Db2Transaction.prototype.begin.call(ctx, mockConnection);
       expect(mockConnection.setIsolationLevel).toHaveBeenCalledWith(8);
     });
 
     test('calls setIsolationLevel with READ_COMMITTED string', async () => {
-      mockConnection.setIsolationLevel = jest.fn();
+      mockConnection.setIsolationLevel = vi.fn();
       const ctx = { client: { config: { isolationLevel: 'READ_COMMITTED' } } };
       await Db2Transaction.prototype.begin.call(ctx, mockConnection);
       expect(mockConnection.setIsolationLevel).toHaveBeenCalledWith(2);
