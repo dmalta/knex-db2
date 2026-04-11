@@ -18,14 +18,15 @@
 
 **Goal:** Comprehensive real-world integration test suite for DB2 with isolated execution, connection config file, and full DDL/DML coverage.
 
-**Status:** planned
+**Status:** complete ✅
 
-**Requirements**: TBD
+**Requirements**: IT-QUERY, IT-TX, IT-COLTYPE, IT-DDL
 **Depends on:** Phase 01
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 2 to break down)
+- [x] 02-01-PLAN.md — DML queries, transactions, DB2-specific features (Wave 1)
+- [x] 02-02-PLAN.md — Schema DDL, column types, introspection, indexes (Wave 2)
 
 ### Phase 3: Bulk Insert via ibm_db
 
