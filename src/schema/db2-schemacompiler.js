@@ -43,10 +43,9 @@ class Db2SchemaCompiler extends SchemaCompiler {
     this.pushQuery(`RENAME TABLE ${schemaPrefix}${from} TO ${to}`);
   }
 
-  dropTableIfExists(_tableName) {
-    throw new Error(
-      'DROP TABLE IF EXISTS is not supported — use dropTable() and handle SQL0204N (object not found) in your application'
-    );
+  dropTableIfExists(tableName) {
+    const schemaPrefix = this.schema ? `${this.schema}.` : '';
+    this.pushQuery({ sql: `DROP TABLE ${schemaPrefix}${tableName.toUpperCase()}`, suppressIfNotFound: true });
   }
 
   createSchema(schemaName) {
