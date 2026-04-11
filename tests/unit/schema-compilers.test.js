@@ -76,6 +76,96 @@ describe('DB2 Schema Compiler Unit Tests', () => {
       const statements = compileColumn('text', ['body'], (column) => column.comment("Bob's note"));
       expect(statements.some((sql) => /COMMENT ON COLUMN users\.body IS 'Bob''s note'/i.test(sql))).toBe(true);
     });
+
+    test('bigIncrements with primaryKey:false omits primary key', () => {
+      const statements = compileColumn('bigIncrements', ['id', { primaryKey: false }]);
+      expect(statements.join(' ')).toContain('bigint not null generated always as identity');
+      expect(statements.join(' ')).not.toContain('primary key');
+    });
+
+    test('bigIncrements defaults to including primary key', () => {
+      const statements = compileColumn('bigIncrements', ['id']);
+      expect(statements.join(' ')).toContain('primary key');
+    });
+
+    test('timestamp({ useTz: true }) throws expected DB2 z/OS error', () => {
+      expect(() => compileColumn('timestamp', ['created_at', { useTz: true }])).toThrow(
+        'timestamp({ useTz: true }) is not supported for db2-zos'
+      );
+    });
+
+    test('datetime() delegates to timestamp type', () => {
+      const statements = compileColumn('datetime', ['created_at']);
+      expect(statements.join(' ')).toContain('timestamp');
+    });
+
+    test('datetime({ useTz: false }) delegates to timestamp without throwing', () => {
+      const statements = compileColumn('datetime', ['created_at', { useTz: false }]);
+      expect(statements.join(' ')).toContain('timestamp');
+    });
+  });
+
+  describe('Schema Compiler edge cases', () => {
+    const withConnectionSettings = (settings, callback) => {
+      const originalSettings = db.client.connectionSettings;
+      db.client.connectionSettings = settings;
+      try {
+        callback();
+      } finally {
+        db.client.connectionSettings = originalSettings;
+      }
+    };
+
+    test('dropTableIfExists throws with DB2-specific message', () => {
+      const sc = db.client.schemaCompiler(db.schema);
+      expect(() => sc.dropTableIfExists('users')).toThrow(
+        'DROP TABLE IF EXISTS is not supported — use dropTable() and handle SQL0204N (object not found) in your application'
+      );
+    });
+
+    test('createSchemaIfNotExists throws with DB2-specific message', () => {
+      const sc = db.client.schemaCompiler(db.schema);
+      expect(() => sc.createSchemaIfNotExists('MYSCHEMA')).toThrow(
+        'CREATE SCHEMA IF NOT EXISTS is not supported — use createSchema() and handle errors in your application'
+      );
+    });
+
+    test('dropSchemaIfExists throws with DB2-specific message', () => {
+      const sc = db.client.schemaCompiler(db.schema);
+      expect(() => sc.dropSchemaIfExists('MYSCHEMA')).toThrow(
+        'DROP SCHEMA IF EXISTS is not supported — use dropSchema() and handle errors in your application'
+      );
+    });
+
+    test('dropSchema with cascade=true emits CASCADE', () => {
+      const sc = db.client.schemaCompiler(db.schema);
+      sc.dropSchema('MYSCHEMA', true);
+      expect(sc.sequence[0].sql).toBe('DROP SCHEMA MYSCHEMA CASCADE');
+    });
+
+    test('dropSchema with cascade=false emits RESTRICT', () => {
+      const sc = db.client.schemaCompiler(db.schema);
+      sc.dropSchema('MYSCHEMA', false);
+      expect(sc.sequence[0].sql).toBe('DROP SCHEMA MYSCHEMA RESTRICT');
+    });
+
+    test('hasTable with schema includes creator binding', () => {
+      withConnectionSettings({ currentSchema: 'MYSCHEMA' }, () => {
+        const sc = db.client.schemaCompiler(db.schema);
+        sc.hasTable('users');
+        expect(sc.sequence[0].sql).toContain('AND CREATOR = ?');
+        expect(sc.sequence[0].bindings).toEqual(['USERS', 'MYSCHEMA']);
+      });
+    });
+
+    test('hasColumn with schema includes tbcreator binding', () => {
+      withConnectionSettings({ currentSchema: 'MYSCHEMA' }, () => {
+        const sc = db.client.schemaCompiler(db.schema);
+        sc.hasColumn('users', 'email');
+        expect(sc.sequence[0].sql).toContain('AND TBCREATOR = ?');
+        expect(sc.sequence[0].bindings).toEqual(['USERS', 'EMAIL', 'MYSCHEMA']);
+      });
+    });
   });
 });
 
@@ -122,5 +212,9 @@ describe('Db2SchemaCompiler', () => {
   test('dropTableIfExists() throws — not supported on DB2 z/OS', () => {
     const sc = db.client.schemaCompiler(db.schema);
     expect(() => sc.dropTableIfExists('MYTABLE')).toThrow('not supported');
+  });
+  test('dropSchemaIfExists() throws — not supported on DB2 z/OS', () => {
+    const sc = db.client.schemaCompiler(db.schema);
+    expect(() => sc.dropSchemaIfExists('MYSCHEMA')).toThrow('not supported');
   });
 });
