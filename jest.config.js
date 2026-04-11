@@ -5,7 +5,6 @@ module.exports = {
   testPathIgnorePatterns: ['<rootDir>/src/__tests__/helpers/'],
   collectCoverageFrom: [
     'src/**/*.js',
-    '!src/**/*.d.ts',
     '!src/**/*.test.js',
     '!src/**/*.spec.js',
     '!src/__tests__/helpers/**',
