@@ -166,6 +166,19 @@ describe('DB2 Schema Compiler Unit Tests', () => {
         expect(sc.sequence[0].bindings).toEqual(['USERS', 'EMAIL', 'MYSCHEMA']);
       });
     });
+
+    test('hasSchema uppercases the schema name and targets SYSSCHEMATA', () => {
+      const sc = db.client.schemaCompiler(db.schema);
+      sc.hasSchema('myschema');
+      expect(sc.sequence[0].sql).toContain('SYSIBM.SYSSCHEMATA');
+      expect(sc.sequence[0].bindings).toEqual(['MYSCHEMA']);
+    });
+
+    test('createSchema emits CREATE SCHEMA statement', () => {
+      const sc = db.client.schemaCompiler(db.schema);
+      sc.createSchema('MYSCHEMA');
+      expect(sc.sequence[0].sql).toBe('CREATE SCHEMA MYSCHEMA');
+    });
   });
 
   describe('Query Compiler columnInfo output parsing', () => {
