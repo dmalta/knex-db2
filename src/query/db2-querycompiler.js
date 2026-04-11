@@ -69,33 +69,60 @@ class Db2QueryCompiler extends QueryCompiler {
   // method detects __db2BulkInsert and uses ibm_db's column-wise ARRAY params
   // to execute all rows in a single round-trip.
   // Single-row inserts and raw SQL inserts fall through to super.insert() unchanged.
+  // .returning() on a single-row insert wraps the INSERT in a FINAL TABLE select.
   insert() {
     const insertValues = this.single.insert || [];
     const insertData = this._prepInsert(insertValues);
+    const returning = this.single.returning;
 
-    // Fall through for raw SQL inserts or single-row inserts
-    if (
-      typeof insertData === 'string' ||
-      !insertData.columns ||
-      !insertData.columns.length ||
-      !insertData.values ||
-      insertData.values.length <= 1
-    ) {
-      return super.insert();
+    const isBulk =
+      typeof insertData !== 'string' &&
+      insertData.columns &&
+      insertData.columns.length &&
+      insertData.values &&
+      insertData.values.length > 1;
+
+    if (isBulk) {
+      if (returning) {
+        throw new Error(
+          'DB2: .returning() is not supported with bulk inserts (multi-row arrays). ' +
+            'Insert rows individually to use .returning().'
+        );
+      }
+
+      const columns = insertData.columns;
+      const placeholders = columns.map(() => '?').join(', ');
+      const sql =
+        this.with() +
+        `insert into ${this.tableName} (${this.formatter.columnize(columns)}) values (${placeholders})`;
+
+      return {
+        sql,
+        bindings: [],
+        __db2BulkInsert: {
+          columns,
+          values: insertData.values,
+        },
+      };
     }
 
-    const columns = insertData.columns;
-    const placeholders = columns.map(() => '?').join(', ');
-    const sql =
-      this.with() + `insert into ${this.tableName} (${this.formatter.columnize(columns)}) values (${placeholders})`;
+    // Single-row or raw insert
+    const base = super.insert();
+
+    if (!returning) {
+      return base;
+    }
+
+    const retCols = Array.isArray(returning) ? returning : [returning];
+    const cols =
+      retCols.length === 1 && retCols[0] === '*' ? '*' : this.formatter.columnize(retCols);
+
+    const baseSql = typeof base === 'string' ? base : base.sql;
+    const baseBindings = typeof base === 'string' ? [] : base.bindings || [];
 
     return {
-      sql,
-      bindings: [],
-      __db2BulkInsert: {
-        columns,
-        values: insertData.values,
-      },
+      sql: `select ${cols} from final table (${baseSql})`,
+      bindings: baseBindings,
     };
   }
 
