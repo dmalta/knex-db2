@@ -2,7 +2,7 @@
 // Requires DB2_REAL_TEST=true and a live IBM DB2 z/OS connection to run.
 const knex = require('knex');
 const Db2Client = require('../../src/client');
-const { DB_CONFIG, POOL_CONFIG, shouldRunRealTests, TEST_TIMEOUT, TEST_TABLESPACE } = require('../helpers/test-config');
+const { DB_CONFIG, POOL_CONFIG, shouldRunRealTests, TEST_TIMEOUT, TEST_TABLESPACE, cleanupDanglingTestTables } = require('../helpers/test-config');
 
 const runTests = shouldRunRealTests();
 
@@ -19,6 +19,8 @@ const BULK_TABLE = `KNEX_IT_BULK_${ts}`;
       pool: POOL_CONFIG,
     });
 
+    await cleanupDanglingTestTables(db);
+
     await db.raw(
       `CREATE TABLE ${BULK_TABLE} (id INTEGER NOT NULL, name VARCHAR(50), amount DECIMAL(10,2)) IN ${TEST_TABLESPACE}`
     );
@@ -26,7 +28,7 @@ const BULK_TABLE = `KNEX_IT_BULK_${ts}`;
 
   afterAll(async () => {
     if (db) {
-      try { await db.schema.dropTableIfExists(BULK_TABLE); } catch (e) { console.warn('Cleanup warning:', e.message); }
+      try { await db.schema.dropTable(BULK_TABLE); } catch (e) { console.warn('Cleanup warning:', e.message); }
       await db.destroy();
     }
   }, TEST_TIMEOUT);

@@ -1,9 +1,9 @@
 {
-    "hostname": "mbgmvsc.pok.ibm.com",
-    "port": 3906,
-    "database": "DB2C",
-    "user": "PRESS",
-    "password": "V32C9vjg",
-    "tablespace": "DSQDBDEF.DSQTSDEF",
+    "hostname": "mebi3.vipa.uk.ibm.com",
+    "port": 446,
+    "database": "BNLDSNL1",
+    "user": "dmalta",
+    "password": "GCE13HFC",
+    "tablespace": "QDB86374.QTW86374",
     "$schema": "KNEXTEST"
 }

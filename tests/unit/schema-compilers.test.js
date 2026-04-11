@@ -116,11 +116,12 @@ describe('DB2 Schema Compiler Unit Tests', () => {
       }
     };
 
-    test('dropTableIfExists throws with DB2-specific message', () => {
+    test('dropTableIfExists emits DROP TABLE with suppressIfNotFound', () => {
       const sc = db.client.schemaCompiler(db.schema);
-      expect(() => sc.dropTableIfExists('users')).toThrow(
-        'DROP TABLE IF EXISTS is not supported — use dropTable() and handle SQL0204N (object not found) in your application'
-      );
+      sc.dropTableIfExists('users');
+      const q = sc.sequence[0];
+      expect(q.sql).toBe('DROP TABLE USERS');
+      expect(q.suppressIfNotFound).toBe(true);
     });
 
     test('createSchemaIfNotExists throws with DB2-specific message', () => {
@@ -310,12 +311,22 @@ describe('Db2SchemaCompiler', () => {
     const sc = db.client.schemaCompiler(db.schema);
     expect(() => sc.createSchemaIfNotExists('MYSCHEMA')).toThrow('not supported');
   });
-  test('dropTableIfExists() throws — not supported on DB2 z/OS', () => {
+  test('dropTableIfExists() emits DROP TABLE with suppressIfNotFound', () => {
     const sc = db.client.schemaCompiler(db.schema);
-    expect(() => sc.dropTableIfExists('MYTABLE')).toThrow('not supported');
+    sc.dropTableIfExists('MYTABLE');
+    const q = sc.sequence[0];
+    expect(q.sql).toBe('DROP TABLE MYTABLE');
+    expect(q.suppressIfNotFound).toBe(true);
   });
   test('dropSchemaIfExists() throws — not supported on DB2 z/OS', () => {
     const sc = db.client.schemaCompiler(db.schema);
     expect(() => sc.dropSchemaIfExists('MYSCHEMA')).toThrow('not supported');
+  });
+  test('createTableIfNotExists() tags all queries with suppressIfExists', () => {
+    const compiled = db.schema.createTableIfNotExists('MYTABLE', (t) => {
+      t.integer('id').notNullable();
+    }).toSQL();
+    expect(compiled.length).toBeGreaterThan(0);
+    compiled.forEach((q) => expect(q.suppressIfExists).toBe(true));
   });
 });

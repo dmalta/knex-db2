@@ -4,7 +4,7 @@
 // Requires DB2_REAL_TEST=true to run.
 const knex = require('knex');
 const Db2Client = require('../../src/client');
-const { DB_CONFIG, POOL_CONFIG, shouldRunRealTests, TEST_TIMEOUT, TEST_TABLESPACE } = require('../helpers/test-config');
+const { DB_CONFIG, POOL_CONFIG, shouldRunRealTests, TEST_TIMEOUT, TEST_TABLESPACE, cleanupDanglingTestTables } = require('../helpers/test-config');
 
 const runTests = shouldRunRealTests();
 
@@ -12,6 +12,7 @@ const ts = Date.now();
 const TYPE_TABLE    = `KNEX_IT_TYPE_${ts}`;      // column type coverage table
 const SCRATCH_TABLE = `KNEX_IT_SCRATCH_${ts}`;   // DDL mutations table
 const REFS_TABLE    = `KNEX_IT_REFS_${ts}`;      // FK reference table
+const FK_TABLE      = `KNEX_IT_FK_${ts}`;        // dedicated FK constraint tests
 let scratchTableName = SCRATCH_TABLE;             // mutable — updated after renameTable test
 
 (runTests ? describe : describe.skip)('DB2 Schema Integration Tests', () => {
@@ -24,14 +25,14 @@ let scratchTableName = SCRATCH_TABLE;             // mutable — updated after r
       pool: POOL_CONFIG,
     });
 
-    // TYPE_TABLE — all DB2-specific column types
+    await cleanupDanglingTestTables(db);
+
     // TYPE_TABLE — all DB2-specific column types.
-    // Uses plain integer (not increments) for the id column since this DB2 z/OS
-    // environment cannot auto-create the backing unique index for any PK constraint
-    // (SQL0540N). The TYPE_TABLE insert test therefore works without a primary key.
+    // Uses increments with primaryKey:false — PRESS lacks CREATE INDEX on the default
+    // stogroup (DSQSGDEF), so any implicit PK index creation fails with SQL0551N.
     await db.schema.createTable(TYPE_TABLE, (t) => {
       t.tablespace(TEST_TABLESPACE);
-      t.increments('id');
+      t.increments('id', { primaryKey: false });
       t.boolean('flag');
       // t.text('notes');  // clob(32000) — requires LOB stogroup access (INSERT test is skipped)
       t.uuid('bin_id', { useBinaryUuid: true });
@@ -46,11 +47,11 @@ let scratchTableName = SCRATCH_TABLE;             // mutable — updated after r
     // SCRATCH_TABLE — minimal schema for sequential DDL mutation tests
     await db.schema.createTable(SCRATCH_TABLE, (t) => {
       t.tablespace(TEST_TABLESPACE);
-      t.integer('id').notNullable();
+      t.integer('id').notNullable().primary();
       t.string('label', 50);
     });
 
-    // REFS_TABLE — FK reference target
+    // REFS_TABLE — FK reference target; ref_id must be a primary key for FK references to work
     await db.schema.createTable(REFS_TABLE, (t) => {
       t.tablespace(TEST_TABLESPACE);
       t.integer('ref_id').notNullable().primary();
@@ -62,14 +63,23 @@ let scratchTableName = SCRATCH_TABLE;             // mutable — updated after r
     ]) {
       await db(REFS_TABLE).insert(row);
     }
+
+    // FK_TABLE — empty table used for FK constraint tests.
+    // Created with no rows so that ALTER TABLE ADD CONSTRAINT FOREIGN KEY
+    // does NOT set the tablespace to DB2 z/OS CHECK PENDING state.
+    await db.schema.createTable(FK_TABLE, (t) => {
+      t.tablespace(TEST_TABLESPACE);
+      t.integer('id').notNullable().primary();
+    });
   }, TEST_TIMEOUT * 3);
 
   afterAll(async () => {
     if (db) {
-      try { await db.schema.dropTableIfExists(TYPE_TABLE); } catch (e) { console.warn('Cleanup warning:', e.message); }
-      try { await db.schema.dropTableIfExists(scratchTableName); } catch (e) { console.warn('Cleanup warning:', e.message); }
-      try { await db.schema.dropTableIfExists(SCRATCH_TABLE); } catch (e) { /* already renamed */ }
-      try { await db.schema.dropTableIfExists(REFS_TABLE); } catch (e) { console.warn('Cleanup warning:', e.message); }
+      try { await db.schema.dropTable(TYPE_TABLE); } catch (e) { console.warn('Cleanup warning:', e.message); }
+      try { await db.schema.dropTable(scratchTableName); } catch (e) { console.warn('Cleanup warning:', e.message); }
+      try { await db.schema.dropTable(SCRATCH_TABLE); } catch (e) { /* already renamed */ }
+      try { await db.schema.dropTable(REFS_TABLE); } catch (e) { console.warn('Cleanup warning:', e.message); }
+      try { await db.schema.dropTable(FK_TABLE); } catch (e) { console.warn('Cleanup warning:', e.message); }
       await db.destroy();
     }
   }, TEST_TIMEOUT);
@@ -113,8 +123,10 @@ let scratchTableName = SCRATCH_TABLE;             // mutable — updated after r
       expect(result).toBe(false);
     }, TEST_TIMEOUT);
 
-    test('dropTableIfExists — throws db2-zos (use dropTable and handle SQL0204N)', () => {
-      expect(() => db.schema.dropTableIfExists('KNEX_NONEXISTENT_XYZ99')).toThrow('db2-zos');
+    test('dropTableIfExists — silently succeeds on non-existent table', async () => {
+      await expect(
+        db.schema.dropTableIfExists('KNEX_NONEXISTENT_XYZ99')
+      ).resolves.not.toThrow();
     }, TEST_TIMEOUT);
   });
 
@@ -165,7 +177,9 @@ let scratchTableName = SCRATCH_TABLE;             // mutable — updated after r
       expect(cols).toContain('AMOUNT');
     }, TEST_TIMEOUT);
 
-    test('alterColumns — changes label column to NOT NULL', async () => {
+    // SKIP: DB2 z/OS ALTER COLUMN only supports identity-column modifications;
+    // SET NOT NULL is not valid syntax — SQL0199N.
+    test.skip('alterColumns — changes label column to NOT NULL', async () => {
       await db.schema.table(SCRATCH_TABLE, (t) => {
         t.string('label', 50).notNullable().alter();
       });
@@ -175,7 +189,9 @@ let scratchTableName = SCRATCH_TABLE;             // mutable — updated after r
       ).rejects.toThrow();
     }, TEST_TIMEOUT);
 
-    test('dropColumn — removes amount column', async () => {
+    // SKIP: DB2 z/OS requires REORG TABLE after ADD COLUMN before DROP COLUMN
+    // is allowed — SQL0650N reason 24.
+    test.skip('dropColumn — removes amount column', async () => {
       await db.schema.table(SCRATCH_TABLE, (t) => {
         t.dropColumn('amount');
       });
@@ -228,27 +244,30 @@ let scratchTableName = SCRATCH_TABLE;             // mutable — updated after r
       ).rejects.toThrow();
     }, TEST_TIMEOUT);
 
+    // FK tests use FK_TABLE (created empty in beforeAll) so that
+    // ALTER TABLE ADD CONSTRAINT FOREIGN KEY does not trigger DB2 z/OS
+    // CHECK PENDING state (which only occurs when existing rows are present).
     test('foreign key — valid FK value is accepted', async () => {
-      await db.schema.table(SCRATCH_TABLE, (t) => {
+      await db.schema.table(FK_TABLE, (t) => {
         t.integer('ref_id').references('ref_id').inTable(REFS_TABLE);
       });
       await expect(
-        db(SCRATCH_TABLE).insert({ id: 30, title: 'fk', ref_id: 1 })
+        db(FK_TABLE).insert({ id: 1, ref_id: 1 })
       ).resolves.toBeDefined();
     }, TEST_TIMEOUT);
 
     test('foreign key — invalid FK value is rejected', async () => {
       await expect(
-        db(SCRATCH_TABLE).insert({ id: 31, title: 'bad_fk', ref_id: 999 })
+        db(FK_TABLE).insert({ id: 2, ref_id: 999 })
       ).rejects.toThrow();
     }, TEST_TIMEOUT);
 
     test('dropForeign — removes FK constraint; invalid ref_id now accepted', async () => {
-      await db.schema.table(SCRATCH_TABLE, (t) => {
+      await db.schema.table(FK_TABLE, (t) => {
         t.dropForeign(['ref_id']);
       });
       await expect(
-        db(SCRATCH_TABLE).insert({ id: 32, title: 'ok_now', ref_id: 999 })
+        db(FK_TABLE).insert({ id: 3, ref_id: 999 })
       ).resolves.toBeDefined();
     }, TEST_TIMEOUT);
 

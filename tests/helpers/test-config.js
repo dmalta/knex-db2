@@ -45,6 +45,29 @@ const skipIfNoRealDB = (testName) => {
 // Common test timeout
 const TEST_TIMEOUT = 30000;
 
+/**
+ * Drop all KNEX_IT_% tables owned by the current DB2 user.
+ * Call this at the top of beforeAll to sweep up tables left behind by
+ * previous test runs that were interrupted or whose afterAll failed.
+ */
+async function cleanupDanglingTestTables(db) {
+  try {
+    const rows = await db.raw(
+      `SELECT NAME FROM SYSIBM.SYSTABLES WHERE NAME LIKE 'KNEX_IT_%' AND CREATOR = USER AND TYPE = 'T'`
+    );
+    for (const row of rows) {
+      const name = row.NAME || row.name;
+      try {
+        await db.schema.dropTable(name);
+      } catch (e) {
+        console.warn(`Pre-test cleanup: could not drop ${name}: ${e.message}`);
+      }
+    }
+  } catch (e) {
+    console.warn('Pre-test cleanup catalog query failed:', e.message);
+  }
+}
+
 module.exports = {
   DB_CONFIG,
   TEST_TABLESPACE,
@@ -52,4 +75,5 @@ module.exports = {
   shouldRunRealTests,
   skipIfNoRealDB,
   TEST_TIMEOUT,
+  cleanupDanglingTestTables,
 };

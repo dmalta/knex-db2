@@ -2,7 +2,7 @@
 // Tests query builder features, joins, aggregations, and advanced SQL
 const knex = require('knex');
 const Db2Client = require('../../src/client');
-const { DB_CONFIG, POOL_CONFIG, shouldRunRealTests, TEST_TIMEOUT, TEST_TABLESPACE } = require('../helpers/test-config');
+const { DB_CONFIG, POOL_CONFIG, shouldRunRealTests, TEST_TIMEOUT, TEST_TABLESPACE, cleanupDanglingTestTables } = require('../helpers/test-config');
 
 const runTests = shouldRunRealTests();
 
@@ -19,6 +19,8 @@ const REL_TABLE = `KNEX_IT_REL_${ts}`;
       connection: DB_CONFIG,
       pool: POOL_CONFIG,
     });
+
+    await cleanupDanglingTestTables(db);
 
     // Create FIXTURE_TABLE (explicit tablespace required — PRESS lacks USE STOGROUP on SYSDEFLT)
     await db.raw(
@@ -56,8 +58,8 @@ const REL_TABLE = `KNEX_IT_REL_${ts}`;
 
   afterAll(async () => {
     if (db) {
-      try { await db.schema.dropTableIfExists(FIXTURE_TABLE); } catch (e) { console.warn('Cleanup warning:', e.message); }
-      try { await db.schema.dropTableIfExists(REL_TABLE); } catch (e) { console.warn('Cleanup warning:', e.message); }
+      try { await db.schema.dropTable(FIXTURE_TABLE); } catch (e) { console.warn('Cleanup warning:', e.message); }
+      try { await db.schema.dropTable(REL_TABLE); } catch (e) { console.warn('Cleanup warning:', e.message); }
       await db.destroy();
     }
   }, TEST_TIMEOUT);
@@ -220,7 +222,7 @@ const REL_TABLE = `KNEX_IT_REL_${ts}`;
         const cnt = parseInt(result.ROW_COUNT, 10);
         expect(cnt).toBe(0);
       } finally {
-        try { await db.schema.dropTableIfExists(truncTable); } catch (e) { console.warn('Cleanup warning:', e.message); }
+        try { await db.schema.dropTable(truncTable); } catch (e) { console.warn('Cleanup warning:', e.message); }
       }
     }, TEST_TIMEOUT);
 
