@@ -59,12 +59,22 @@ describe('DB2 Compiler Unit Tests', () => {
       });
 
       test('should compile INSERT with multiple rows', () => {
+        // DB2 z/OS does not support multi-VALUES SQL — the compiler emits a single-row
+        // template and carries row data in __db2BulkInsert for client-level ARRAY params.
         const query = db('users').insert([
           { name: 'John', email: 'john@example.com' },
           { name: 'Jane', email: 'jane@example.com' },
         ]);
         const compiled = query.toSQL();
-        expect(compiled.sql).toBe('insert into users (email, name) values (?, ?), (?, ?)');
+        expect(compiled.sql).toBe('insert into users (email, name) values (?, ?)');
+        expect(compiled.bindings).toEqual([]);
+        expect(compiled.__db2BulkInsert).toMatchObject({
+          columns: ['email', 'name'],
+          values: [
+            ['john@example.com', 'John'],
+            ['jane@example.com', 'Jane'],
+          ],
+        });
       });
     });
 

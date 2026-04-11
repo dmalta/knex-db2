@@ -62,6 +62,44 @@ class Db2QueryCompiler extends QueryCompiler {
     return `UPPER(${this._columnClause(statement)}) ${this._not(statement, 'LIKE ')}UPPER(${this._valueClause(statement)})`;
   }
 
+  // Multi-row insert fast path for DB2 z/OS.
+  // DB2 z/OS does not support multi-VALUES SQL (INSERT INTO t VALUES (...),(...)).
+  // For multi-row data, emit a single-row template SQL plus a __db2BulkInsert
+  // property carrying the column list and all row values. The client's query()
+  // method detects __db2BulkInsert and uses ibm_db's column-wise ARRAY params
+  // to execute all rows in a single round-trip.
+  // Single-row inserts and raw SQL inserts fall through to super.insert() unchanged.
+  insert() {
+    const insertValues = this.single.insert || [];
+    const insertData = this._prepInsert(insertValues);
+
+    // Fall through for raw SQL inserts or single-row inserts
+    if (
+      typeof insertData === 'string' ||
+      !insertData.columns ||
+      !insertData.columns.length ||
+      !insertData.values ||
+      insertData.values.length <= 1
+    ) {
+      return super.insert();
+    }
+
+    const columns = insertData.columns;
+    const placeholders = columns.map(() => '?').join(', ');
+    const sql =
+      this.with() +
+      `insert into ${this.tableName} (${this.formatter.columnize(columns)}) values (${placeholders})`;
+
+    return {
+      sql,
+      bindings: [],
+      __db2BulkInsert: {
+        columns,
+        values: insertData.values,
+      },
+    };
+  }
+
   // Strip RECURSIVE keyword — DB2 z/OS does not use it (identical to MSSQL).
   with() {
     if (!this.grouped.with) return super.with();
