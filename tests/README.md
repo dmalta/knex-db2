@@ -2,23 +2,30 @@
 
 ## Overview
 
-The test suite has been reorganized into a logical, structured hierarchy that separates concerns and makes testing more maintainable.
+The test suite is organized into a clean hierarchy that separates concerns and makes testing maintainable.
 
 ## Directory Structure
 
 ```
-src/__tests__/
+tests/
 ├── unit/                          # Unit tests (no database connection required)
 │   ├── client.test.js            # DB2 client class unit tests
-│   ├── compilers.test.js         # Query/schema compiler tests
-│   └── error-handling.test.js    # Error handling and mapping tests
+│   ├── compilers.test.js         # Query compiler tests
+│   ├── db2-errors.test.js        # DB2 error module tests
+│   ├── error-handling.test.js    # Error handling and mapping tests
+│   ├── exports.test.js           # Main index exports tests
+│   ├── schema-compilers.test.js  # Schema compiler tests
+│   └── table-transaction.test.js # Table/transaction unit tests
 ├── integration/                   # Integration tests (require real DB2 connection)
 │   ├── connection.test.js        # Connection management and basic queries
 │   ├── queries.test.js           # Complex query operations
-│   └── schema.test.js            # Schema operations (DDL)
+│   ├── schema.test.js            # Schema operations (DDL)
+│   ├── db2-config.json           # Real DB2 credentials (gitignored)
+│   ├── db2-config-example.json   # Example config template
+│   └── README.md                 # Integration test setup guide
 ├── helpers/
 │   └── test-config.js            # Shared configuration and utilities
-└── integration.test.js           # Legacy integration test (kept for compatibility)
+└── README.md                     # This file
 ```
 
 ## Test Types

@@ -2,7 +2,7 @@
  * Test to verify that db2-errors exports are available from the main index
  */
 
-const knexDb2 = require('../src/index');
+const knexDb2 = require('../../src/index');
 
 describe('Main Index Exports', () => {
   test('should export the main client', () => {
