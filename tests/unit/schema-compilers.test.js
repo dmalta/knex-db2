@@ -167,6 +167,94 @@ describe('DB2 Schema Compiler Unit Tests', () => {
       });
     });
   });
+
+  describe('Query Compiler columnInfo output parsing', () => {
+    const withConnectionSettings = (settings, callback) => {
+      const originalSettings = db.client.connectionSettings;
+      db.client.connectionSettings = settings;
+      try {
+        callback();
+      } finally {
+        db.client.connectionSettings = originalSettings;
+      }
+    };
+
+    const getColumnInfoQuery = (columnName) => db.table('users').columnInfo(columnName).toSQL();
+
+    const namedRow = {
+      NAME: 'ID',
+      COLTYPE: 'INTEGER',
+      LENGTH: 4,
+      SCALE: 0,
+      NULLS: 'N',
+      DEFAULT: null,
+    };
+
+    test('named-key rows parse into column metadata map', () => {
+      const compiled = getColumnInfoQuery();
+      const cols = compiled.output([namedRow]);
+      expect(cols.ID).toEqual({
+        type: 'INTEGER',
+        maxLength: 4,
+        scale: 0,
+        nullable: false,
+        defaultValue: undefined,
+      });
+    });
+
+    test('array-style rows parse into column metadata map', () => {
+      const compiled = getColumnInfoQuery();
+      const cols = compiled.output([['ID', 'INTEGER', 4, 0, 'N', null]]);
+      expect(cols.ID.type).toBe('INTEGER');
+      expect(cols.ID.nullable).toBe(false);
+      expect(cols.ID.maxLength).toBe(4);
+    });
+
+    test('numeric string key rows parse into column metadata map', () => {
+      const compiled = getColumnInfoQuery();
+      const cols = compiled.output([{ 0: 'ID', 1: 'INTEGER', 2: 4, 3: 0, 4: 'N', 5: null }]);
+      expect(cols.ID.type).toBe('INTEGER');
+      expect(cols.ID.scale).toBe(0);
+    });
+
+    test('resp.rows wrapper format is handled', () => {
+      const compiled = getColumnInfoQuery();
+      const cols = compiled.output({ rows: [namedRow] });
+      expect(cols.ID.type).toBe('INTEGER');
+    });
+
+    test('NULLS:Y maps to nullable:true', () => {
+      const compiled = getColumnInfoQuery();
+      const cols = compiled.output([{ ...namedRow, NULLS: 'Y' }]);
+      expect(cols.ID.nullable).toBe(true);
+    });
+
+    test('DEFAULT values are preserved', () => {
+      const compiled = getColumnInfoQuery();
+      const cols = compiled.output([{ ...namedRow, DEFAULT: '42' }]);
+      expect(cols.ID.defaultValue).toBe('42');
+    });
+
+    test('specific column lookup returns a single descriptor', () => {
+      const compiled = getColumnInfoQuery('ID');
+      const column = compiled.output([namedRow]);
+      expect(column).toEqual({
+        type: 'INTEGER',
+        maxLength: 4,
+        scale: 0,
+        nullable: false,
+        defaultValue: undefined,
+      });
+    });
+
+    test('columnInfo with schema includes TBCREATOR binding', () => {
+      withConnectionSettings({ currentSchema: 'MYSCHEMA' }, () => {
+        const compiled = getColumnInfoQuery();
+        expect(compiled.sql).toContain('AND TBCREATOR = ?');
+        expect(compiled.bindings).toEqual(['USERS', 'MYSCHEMA']);
+      });
+    });
+  });
 });
 
 describe('Db2SchemaCompiler', () => {
