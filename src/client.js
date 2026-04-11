@@ -134,6 +134,13 @@ class Db2Client extends Client {
     if (settings.queryTimeout) options.push(`QUERYTIMEOUT=${settings.queryTimeout}`);
     if (settings.security === 'SSL') options.push('SECURITY=SSL');
 
+    // Append any custom key/value pairs via params: { KEY: 'VALUE', ... }
+    if (settings.params && typeof settings.params === 'object') {
+      for (const [key, value] of Object.entries(settings.params)) {
+        options.push(`${key}=${value}`);
+      }
+    }
+
     return options.join(';') + ';';
   }
 
