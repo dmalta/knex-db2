@@ -7,6 +7,7 @@ class Db2TableCompiler extends TableCompiler {
   }
 
   createQuery(columns, ifNot, like) {
+    const seqStart = this.sequence.length;
     if (like) {
       // DB2 z/OS: CREATE TABLE new AS (SELECT * FROM old) WITH NO DATA
       const sql = `CREATE TABLE ${this.tableName()} AS (SELECT * FROM ${this.tableNameLike()}) WITH NO DATA`;
@@ -35,6 +36,15 @@ class Db2TableCompiler extends TableCompiler {
       }
     }
     if (this.single.comment) this.comment(this.single.comment);
+
+    // createTableIfNotExists: tag every pushed query so that _executeDDL
+    // silently swallows -601 (object already exists) and -607 (constraint
+    // name already in use) — no IF NOT EXISTS syntax needed in the SQL.
+    if (ifNot) {
+      for (let i = seqStart; i < this.sequence.length; i++) {
+        this.sequence[i].suppressIfExists = true;
+      }
+    }
   }
 
   comment(comment) {
