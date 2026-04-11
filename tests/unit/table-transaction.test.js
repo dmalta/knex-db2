@@ -14,6 +14,23 @@ describe('Db2TableCompiler', () => {
   const alter  = (fn) => db.schema.table('users', fn).toSQL();
   const joinSql = (stmts) => stmts.map((s) => s.sql || s).join(' ');
 
+  test('primary() on createTable emits CREATE UNIQUE INDEX then ALTER TABLE ADD CONSTRAINT PRIMARY KEY', () => {
+    const stmts = ddl((t) => {
+      t.integer('id').notNullable().primary();
+    });
+    const sqls = stmts.map((s) => s.sql || s);
+    const createIdx = sqls.find((s) => /CREATE UNIQUE INDEX/i.test(s));
+    const addPk     = sqls.find((s) => /ADD CONSTRAINT.*PRIMARY KEY/i.test(s));
+    expect(createIdx).toBeTruthy();
+    expect(addPk).toBeTruthy();
+    // Both should reference the id column
+    expect(createIdx).toMatch(/\(id\)/i);
+    expect(addPk).toMatch(/\(id\)/i);
+    // CREATE TABLE itself should NOT contain 'primary key' inline
+    const createTable = sqls.find((s) => /CREATE TABLE/i.test(s));
+    expect(createTable).not.toMatch(/primary key/i);
+  });
+
   test('createTable emits CREATE TABLE without IF NOT EXISTS', () => {
     const sql = joinSql(ddl((t) => t.integer('id')));
     expect(sql).toMatch(/CREATE TABLE users/i);

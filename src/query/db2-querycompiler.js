@@ -5,16 +5,16 @@ class Db2QueryCompiler extends QueryCompiler {
   // OFFSET ... FETCH NEXT was introduced in V12; V11 requires ROW_NUMBER().
   select() {
     const sql = super.select(); // base already handles CTEs via components array
-    const limit  = this.single.limit;
+    const limit = this.single.limit;
     const offset = this.single.offset;
 
-    const hasLimit  = limit != null;
+    const hasLimit = limit != null;
     const hasOffset = offset != null;
 
     if (!hasOffset) return sql;
 
     const start = Number(offset) + 1;
-    const end   = hasLimit ? Number(offset) + Number(limit) : null;
+    const end = hasLimit ? Number(offset) + Number(limit) : null;
 
     return (
       `SELECT * FROM (SELECT inner__.*, ROW_NUMBER() OVER() AS rn__ ` +
@@ -27,7 +27,7 @@ class Db2QueryCompiler extends QueryCompiler {
   // When offset is present, the ROW_NUMBER subquery in select() handles the window.
   // When offset is absent, emit FETCH FIRST for plain limit-only queries.
   limit() {
-    const noLimit  = !this.single.limit && this.single.limit !== 0;
+    const noLimit = !this.single.limit && this.single.limit !== 0;
     const hasOffset = this.single.offset != null;
 
     if (noLimit) return '';
@@ -87,8 +87,7 @@ class Db2QueryCompiler extends QueryCompiler {
     const columns = insertData.columns;
     const placeholders = columns.map(() => '?').join(', ');
     const sql =
-      this.with() +
-      `insert into ${this.tableName} (${this.formatter.columnize(columns)}) values (${placeholders})`;
+      this.with() + `insert into ${this.tableName} (${this.formatter.columnize(columns)}) values (${placeholders})`;
 
     return {
       sql,
@@ -118,9 +117,9 @@ class Db2QueryCompiler extends QueryCompiler {
   // Query SYSIBM.SYSCOLUMNS catalog for column metadata.
   // DB2 stores unquoted object names in UPPERCASE.
   columnInfo() {
-    const column   = this.single.columnInfo;
-    const table    = (this.single.table || '').toUpperCase();
-    const schema   = (
+    const column = this.single.columnInfo;
+    const table = (this.single.table || '').toUpperCase();
+    const schema = (
       this.single.schema ||
       this.client.connectionSettings?.currentSchema ||
       this.client.config.connection?.schema ||
@@ -128,9 +127,7 @@ class Db2QueryCompiler extends QueryCompiler {
     ).toUpperCase();
     const bindings = [table];
 
-    let sql =
-      'SELECT NAME, COLTYPE, LENGTH, SCALE, NULLS, DEFAULT' +
-      ' FROM SYSIBM.SYSCOLUMNS WHERE TBNAME = ?';
+    let sql = 'SELECT NAME, COLTYPE, LENGTH, SCALE, NULLS, DEFAULT' + ' FROM SYSIBM.SYSCOLUMNS WHERE TBNAME = ?';
 
     if (schema) {
       sql += ' AND TBCREATOR = ?';
@@ -159,10 +156,10 @@ class Db2QueryCompiler extends QueryCompiler {
 
           if (name && isNaN(name)) {
             cols[name.toUpperCase()] = {
-              type:         (row.COLTYPE || row['COLTYPE'] || row[1] || row['1'] || '').toString().trim(),
-              maxLength:    row.LENGTH  ?? row['LENGTH']  ?? row[2] ?? row['2'],
-              scale:        row.SCALE   ?? row['SCALE']   ?? row[3] ?? row['3'],
-              nullable:     (row.NULLS || row['NULLS'] || row[4] || row['4']) === 'Y',
+              type: (row.COLTYPE || row['COLTYPE'] || row[1] || row['1'] || '').toString().trim(),
+              maxLength: row.LENGTH ?? row['LENGTH'] ?? row[2] ?? row['2'],
+              scale: row.SCALE ?? row['SCALE'] ?? row[3] ?? row['3'],
+              nullable: (row.NULLS || row['NULLS'] || row[4] || row['4']) === 'Y',
               defaultValue: row.DEFAULT ?? row['DEFAULT'] ?? row[5] ?? row['5'],
             };
           }

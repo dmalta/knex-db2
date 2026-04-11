@@ -109,7 +109,7 @@ const ERROR_CATEGORY = Object.freeze({
   CONSTRAINT: 'CONSTRAINT',
   TRANSACTION: 'TRANSACTION',
   RESOURCE: 'RESOURCE',
-  UNKNOWN: 'UNKNOWN'
+  UNKNOWN: 'UNKNOWN',
 });
 
 /**
@@ -119,37 +119,58 @@ const ERROR_CATEGORIES = {
   [ERROR_CATEGORY.CONNECTION]: ['CONNECTION_FAILED', 'HOST_NOT_FOUND', 'COMMUNICATION_ERROR', 'DATABASE_NOT_FOUND'],
   [ERROR_CATEGORY.AUTHENTICATION]: ['AUTHENTICATION_FAILED', 'INVALID_CREDENTIALS'],
   [ERROR_CATEGORY.AUTHORIZATION]: [
-    'INSUFFICIENT_PRIVILEGES', 'AUTHORIZATION_FAILURE', 'AUTHORIZATION_NAME_INVALID',
-    'CANNOT_GRANT_PRIVILEGE', 'CANNOT_REVOKE_PRIVILEGE', 'REVOKE_NOT_AUTHORIZED',
-    'PRIVILEGE_NOT_GRANTED', 'INVALID_AUTHORIZATION', 'GRANT_NOT_ALLOWED',
-    'BIND_AUTHORIZATION_FAILURE', 'AUTHORIZATION_REQUIRED'
+    'INSUFFICIENT_PRIVILEGES',
+    'AUTHORIZATION_FAILURE',
+    'AUTHORIZATION_NAME_INVALID',
+    'CANNOT_GRANT_PRIVILEGE',
+    'CANNOT_REVOKE_PRIVILEGE',
+    'REVOKE_NOT_AUTHORIZED',
+    'PRIVILEGE_NOT_GRANTED',
+    'INVALID_AUTHORIZATION',
+    'GRANT_NOT_ALLOWED',
+    'BIND_AUTHORIZATION_FAILURE',
+    'AUTHORIZATION_REQUIRED',
   ],
   [ERROR_CATEGORY.SYNTAX]: [
-    'SYNTAX_ERROR', 'STATEMENT_TOO_LONG', 'STRING_CONSTANT_TOO_LONG',
-    'INVALID_NUMERIC_LITERAL', 'INVALID_STRING_CONSTANT', 'OBJECT_NAME_TOO_LONG',
-    'INVALID_NAME', 'CLAUSE_NOT_PERMITTED', 'INVALID_HEXADECIMAL_CONSTANT',
-    'INVALID_COLUMN_FUNCTION', 'OPERAND_NOT_COLUMN_FUNCTION', 'INVALID_CHARACTER',
-    'PREDICATE_NOT_VALID', 'WRONG_NUMBER_OF_VALUES', 'ORDER_BY_NOT_VALID'
+    'SYNTAX_ERROR',
+    'STATEMENT_TOO_LONG',
+    'STRING_CONSTANT_TOO_LONG',
+    'INVALID_NUMERIC_LITERAL',
+    'INVALID_STRING_CONSTANT',
+    'OBJECT_NAME_TOO_LONG',
+    'INVALID_NAME',
+    'CLAUSE_NOT_PERMITTED',
+    'INVALID_HEXADECIMAL_CONSTANT',
+    'INVALID_COLUMN_FUNCTION',
+    'OPERAND_NOT_COLUMN_FUNCTION',
+    'INVALID_CHARACTER',
+    'PREDICATE_NOT_VALID',
+    'WRONG_NUMBER_OF_VALUES',
+    'ORDER_BY_NOT_VALID',
   ],
   [ERROR_CATEGORY.SCHEMA]: [
-    'OBJECT_NOT_FOUND', 'COLUMN_NOT_FOUND', 'AMBIGUOUS_COLUMN_REFERENCE',
-    'COLUMN_NOT_FOUND_IN_TABLE', 'ORDER_BY_COLUMN_NOT_SELECTED'
+    'OBJECT_NOT_FOUND',
+    'COLUMN_NOT_FOUND',
+    'AMBIGUOUS_COLUMN_REFERENCE',
+    'COLUMN_NOT_FOUND_IN_TABLE',
+    'ORDER_BY_COLUMN_NOT_SELECTED',
   ],
   [ERROR_CATEGORY.DATA]: [
-    'INPUT_VALUE_TOO_LONG', 'CONVERSION_ERROR', 'NULL_VALUE_NOT_ALLOWED',
-    'INVALID_DATA_TYPE', 'OVERFLOW_ERROR', 'CHARACTER_CONVERSION_ERROR'
+    'INPUT_VALUE_TOO_LONG',
+    'CONVERSION_ERROR',
+    'NULL_VALUE_NOT_ALLOWED',
+    'INVALID_DATA_TYPE',
+    'OVERFLOW_ERROR',
+    'CHARACTER_CONVERSION_ERROR',
   ],
   [ERROR_CATEGORY.CONSTRAINT]: [
-    'FOREIGN_KEY_VIOLATION', 'PARENT_KEY_IN_CHILD_TABLE', 'DELETE_RESTRICT_VIOLATION',
-    'DUPLICATE_KEY'
+    'FOREIGN_KEY_VIOLATION',
+    'PARENT_KEY_IN_CHILD_TABLE',
+    'DELETE_RESTRICT_VIOLATION',
+    'DUPLICATE_KEY',
   ],
-  [ERROR_CATEGORY.TRANSACTION]: [
-    'LOCK_TIMEOUT', 'DEADLOCK_DETECTED', 'BIND_ERROR', 'OBJECT_DELETED',
-    'OBJECT_DROPPED'
-  ],
-  [ERROR_CATEGORY.RESOURCE]: [
-    'RESOURCE_UNAVAILABLE', 'TABLESPACE_FULL', 'TABLESPACE_NOT_AVAILABLE'
-  ]
+  [ERROR_CATEGORY.TRANSACTION]: ['LOCK_TIMEOUT', 'DEADLOCK_DETECTED', 'BIND_ERROR', 'OBJECT_DELETED', 'OBJECT_DROPPED'],
+  [ERROR_CATEGORY.RESOURCE]: ['RESOURCE_UNAVAILABLE', 'TABLESPACE_FULL', 'TABLESPACE_NOT_AVAILABLE'],
 };
 
 /**
@@ -193,8 +214,7 @@ class DB2Error extends Error {
     const retryableCategories = [ERROR_CATEGORY.CONNECTION, ERROR_CATEGORY.RESOURCE, ERROR_CATEGORY.TRANSACTION];
     const retryableTypes = ['LOCK_TIMEOUT', 'DEADLOCK_DETECTED', 'RESOURCE_UNAVAILABLE'];
 
-    return retryableCategories.includes(this.errorCategory) ||
-           retryableTypes.includes(this.errorType);
+    return retryableCategories.includes(this.errorCategory) || retryableTypes.includes(this.errorType);
   }
 
   /**
@@ -202,18 +222,18 @@ class DB2Error extends Error {
    */
   getUserMessage() {
     const messages = {
-      'CONNECTION_FAILED': 'Unable to connect to the database. Please check your connection settings.',
-      'AUTHENTICATION_FAILED': 'Invalid username or password. Please check your credentials.',
-      'INSUFFICIENT_PRIVILEGES': 'You do not have permission to perform this operation.',
-      'OBJECT_NOT_FOUND': 'The requested table, view, or object was not found.',
-      'COLUMN_NOT_FOUND': 'The specified column does not exist.',
-      'SYNTAX_ERROR': 'There is a syntax error in your SQL statement.',
-      'DUPLICATE_KEY': 'A record with this key already exists.',
-      'FOREIGN_KEY_VIOLATION': 'This operation violates a foreign key constraint.',
-      'NULL_VALUE_NOT_ALLOWED': 'A required field cannot be empty.',
-      'DEADLOCK_DETECTED': 'A deadlock was detected. Please try again.',
-      'LOCK_TIMEOUT': 'The operation timed out waiting for a lock. Please try again.',
-      'RESOURCE_UNAVAILABLE': 'System resources are currently unavailable. Please try again later.',
+      CONNECTION_FAILED: 'Unable to connect to the database. Please check your connection settings.',
+      AUTHENTICATION_FAILED: 'Invalid username or password. Please check your credentials.',
+      INSUFFICIENT_PRIVILEGES: 'You do not have permission to perform this operation.',
+      OBJECT_NOT_FOUND: 'The requested table, view, or object was not found.',
+      COLUMN_NOT_FOUND: 'The specified column does not exist.',
+      SYNTAX_ERROR: 'There is a syntax error in your SQL statement.',
+      DUPLICATE_KEY: 'A record with this key already exists.',
+      FOREIGN_KEY_VIOLATION: 'This operation violates a foreign key constraint.',
+      NULL_VALUE_NOT_ALLOWED: 'A required field cannot be empty.',
+      DEADLOCK_DETECTED: 'A deadlock was detected. Please try again.',
+      LOCK_TIMEOUT: 'The operation timed out waiting for a lock. Please try again.',
+      RESOURCE_UNAVAILABLE: 'System resources are currently unavailable. Please try again later.',
     };
 
     return messages[this.errorType] || this.message;
@@ -233,7 +253,7 @@ class DB2Error extends Error {
       sql: this.sql,
       bindings: this.bindings,
       timestamp: this.timestamp,
-      stack: this.stack
+      stack: this.stack,
     };
   }
 }
@@ -306,5 +326,5 @@ module.exports = {
   getErrorType,
   getErrorCategory,
   isDB2ErrorCode,
-  isRetryableError
+  isRetryableError,
 };

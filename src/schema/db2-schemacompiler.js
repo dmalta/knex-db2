@@ -31,16 +31,22 @@ class Db2SchemaCompiler extends SchemaCompiler {
     this.pushQuery({ sql, bindings, output: (resp) => resp.length > 0 });
   }
 
+  hasSchema(schemaName) {
+    const schema = schemaName.toUpperCase();
+    const sql = `SELECT 1 FROM SYSIBM.SYSSCHEMATA WHERE SCHEMANAME = ?`;
+    const bindings = [schema];
+    this.pushQuery({ sql, bindings, output: (resp) => resp.length > 0 });
+  }
+
   renameTable(from, to) {
     const schemaPrefix = this.schema ? `${this.schema}.` : '';
     this.pushQuery(`RENAME TABLE ${schemaPrefix}${from} TO ${to}`);
   }
 
   dropTableIfExists(tableName) {
-    // DB2 z/OS has no DROP TABLE IF EXISTS syntax.
-    // Emit unconditional DROP TABLE; migration author guards with hasTable().
-    const schemaPrefix = this.schema ? `${this.schema}.` : '';
-    this.pushQuery(`DROP TABLE ${schemaPrefix}${tableName}`);
+    throw new Error(
+      'DROP TABLE IF EXISTS is not supported — use dropTable() and handle SQL0204N (object not found) in your application'
+    );
   }
 
   createSchema(schemaName) {
@@ -48,11 +54,8 @@ class Db2SchemaCompiler extends SchemaCompiler {
   }
 
   createSchemaIfNotExists(schemaName) {
-    // DB2 has no CREATE SCHEMA IF NOT EXISTS.
-    // Per planning doc: use stepwise migration — check first, then create.
     throw new Error(
-      'db2-zos: createSchemaIfNotExists() is not supported. ' +
-        'Use knex.schema.hasSchema(name) in your migration, then call createSchema() conditionally.'
+      'CREATE SCHEMA IF NOT EXISTS is not supported — use createSchema() and handle errors in your application'
     );
   }
 
@@ -62,10 +65,7 @@ class Db2SchemaCompiler extends SchemaCompiler {
   }
 
   dropSchemaIfExists(schemaName, cascade) {
-    // DB2 has no DROP SCHEMA IF EXISTS syntax.
-    // Emit unconditional DROP SCHEMA; migration author guards with hasSchema().
-    const qualifier = cascade ? 'CASCADE' : 'RESTRICT';
-    this.pushQuery(`DROP SCHEMA ${schemaName} ${qualifier}`);
+    throw new Error('DROP SCHEMA IF EXISTS is not supported — use dropSchema() and handle errors in your application');
   }
 }
 

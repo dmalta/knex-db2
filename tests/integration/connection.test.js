@@ -34,8 +34,9 @@ const runTests = shouldRunRealTests();
 
     test('should handle connection pool properly', async () => {
       // Execute multiple queries concurrently to test pool
+      // CAST required — DB2 z/OS rejects untyped parameter markers in SELECT list
       const queries = Array.from({ length: 3 }, (_, i) =>
-        db.raw('SELECT ? as query_num FROM SYSIBM.SYSDUMMY1', [i + 1])
+        db.raw('SELECT CAST(? AS INTEGER) as query_num FROM SYSIBM.SYSDUMMY1', [i + 1])
       );
 
       const results = await Promise.all(queries);

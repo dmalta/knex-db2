@@ -15,24 +15,30 @@ class Db2TableCompiler extends TableCompiler {
         this.addColumns(columns, this.addColumnsPrefix);
       }
     } else {
-      const checks = this._addChecks ? this._addChecks() : '';
-      const tablespace = this.single.tablespace
-        ? ` IN ${this.single.tablespace}`
-        : '';
-      const sql =
-        `CREATE TABLE ${this.tableName()} (` +
-        columns.sql.join(', ') +
-        checks +
-        `)${tablespace}`;
-      this.pushQuery(sql);
+      // Collect any t.col().primary() entries, remove them from grouped.alterTable
+      // (so the base-class loop doesn't also try to emit them), then delegate to
+      // this.primary() which emits the correct two-statement DB2 sequence.
+      const pkEntries = (this.grouped.alterTable || []).filter((s) => s.method === 'primary');
+      if (pkEntries.length > 0) {
+        const pkCols = pkEntries.flatMap((e) => (Array.isArray(e.args[0]) ? e.args[0] : [e.args[0]]));
+        const constraintName = pkEntries[0].args[1] || undefined;
+        this.grouped.alterTable = this.grouped.alterTable.filter((s) => s.method !== 'primary');
+        // Push CREATE TABLE first, then delegate PK statements to primary().
+        const checks = this._addChecks ? this._addChecks() : '';
+        const tablespace = this.single.tablespace ? ` IN ${this.single.tablespace}` : '';
+        this.pushQuery(`CREATE TABLE ${this.tableName()} (` + columns.sql.join(', ') + checks + `)${tablespace}`);
+        this.primary(pkCols, constraintName);
+      } else {
+        const checks = this._addChecks ? this._addChecks() : '';
+        const tablespace = this.single.tablespace ? ` IN ${this.single.tablespace}` : '';
+        this.pushQuery(`CREATE TABLE ${this.tableName()} (` + columns.sql.join(', ') + checks + `)${tablespace}`);
+      }
     }
     if (this.single.comment) this.comment(this.single.comment);
   }
 
   comment(comment) {
-    this.pushQuery(
-      `COMMENT ON TABLE ${this.tableName()} IS '${(comment || '').replace(/'/g, "''")}'`
-    );
+    this.pushQuery(`COMMENT ON TABLE ${this.tableName()} IS '${(comment || '').replace(/'/g, "''")}'`);
   }
 
   addColumns(columns, prefix) {
@@ -47,21 +53,47 @@ class Db2TableCompiler extends TableCompiler {
   }
 
   alterColumns(columns, colBuilders) {
-    if (!columns.sql || columns.sql.length === 0) return;
-    columns.sql.forEach((sql) => {
-      this.pushQuery({
-        sql: `ALTER TABLE ${this.tableName()} ${this.alterColumnsPrefix}${sql}`,
-        bindings: columns.bindings,
-      });
+    if (!colBuilders || colBuilders.length === 0) return;
+    // DB2 z/OS does not support full column redefinition in ALTER TABLE.
+    // Generate individual SET/DROP clauses from the modifier flags.
+    colBuilders.forEach((cc) => {
+      const colName = this.formatter.wrap(cc.args[0]);
+      const mods = (cc.columnBuilder && cc.columnBuilder._modifiers) || {};
+
+      // Nullability change: nullable key is present in _modifiers
+      if ('nullable' in mods) {
+        const isNotNull = Array.isArray(mods.nullable) && mods.nullable.length > 0 && mods.nullable[0] === false;
+        this.pushQuery({
+          sql:
+            `ALTER TABLE ${this.tableName()} ALTER COLUMN ${colName} ` + (isNotNull ? 'SET NOT NULL' : 'DROP NOT NULL'),
+          bindings: [],
+        });
+      }
+
+      // Default value change: defaultTo key is present in _modifiers
+      if ('defaultTo' in mods) {
+        const def = Array.isArray(mods.defaultTo) ? mods.defaultTo[0] : mods.defaultTo;
+        if (def === null || def === undefined) {
+          this.pushQuery({
+            sql: `ALTER TABLE ${this.tableName()} ALTER COLUMN ${colName} DROP DEFAULT`,
+            bindings: [],
+          });
+        } else {
+          const quoted = typeof def === 'string' ? `'${def.replace(/'/g, "''")}'` : def;
+          this.pushQuery({
+            sql: `ALTER TABLE ${this.tableName()} ALTER COLUMN ${colName} SET DEFAULT ${quoted}`,
+            bindings: [],
+          });
+        }
+      }
     });
   }
 
   dropColumn() {
     const columns = Array.from(arguments).flat();
     columns.forEach((column) => {
-      this.pushQuery(
-        `ALTER TABLE ${this.tableName()} ${this.dropColumnPrefix}${this.formatter.wrap(column)}`
-      );
+      // DB2 z/OS requires RESTRICT (default) or CASCADE after DROP COLUMN.
+      this.pushQuery(`ALTER TABLE ${this.tableName()} ${this.dropColumnPrefix}${this.formatter.wrap(column)} RESTRICT`);
     });
   }
 
@@ -77,59 +109,43 @@ class Db2TableCompiler extends TableCompiler {
     const name = constraintName
       ? this.formatter.wrap(constraintName)
       : this.formatter.wrap(`${this.tableNameRaw}_pkey`);
-    if (this.forCreate) {
-      this.pushQuery(`CONSTRAINT ${name} PRIMARY KEY (${cols})`);
-    } else {
-      this.pushQuery(
-        `ALTER TABLE ${this.tableName()} ADD CONSTRAINT ${name} PRIMARY KEY (${cols})`
-      );
-    }
+    // DB2 requires a unique index to back any primary key constraint.
+    // Emit both statements regardless of whether this is a CREATE TABLE
+    // or an ALTER TABLE context — they are always separate DDL steps on DB2.
+    this.pushQuery(`CREATE UNIQUE INDEX ${name} ON ${this.tableName()} (${cols})`);
+    this.pushQuery(`ALTER TABLE ${this.tableName()} ADD CONSTRAINT ${name} PRIMARY KEY (${cols})`);
   }
 
   unique(columns, indexName) {
-    const name = indexName
-      ? this.formatter.wrap(indexName)
-      : this._indexCommand('unique', this.tableNameRaw, columns);
+    const name = indexName ? this.formatter.wrap(indexName) : this._indexCommand('unique', this.tableNameRaw, columns);
     const cols = this.formatter.columnize(columns);
     if (this.forCreate) {
       this.pushQuery(`CONSTRAINT ${name} UNIQUE (${cols})`);
     } else {
-      this.pushQuery(
-        `CREATE UNIQUE INDEX ${name} ON ${this.tableName()} (${cols})`
-      );
+      this.pushQuery(`CREATE UNIQUE INDEX ${name} ON ${this.tableName()} (${cols})`);
     }
   }
 
   index(columns, indexName, options) {
-    const name = indexName
-      ? this.formatter.wrap(indexName)
-      : this._indexCommand('index', this.tableNameRaw, columns);
+    const name = indexName ? this.formatter.wrap(indexName) : this._indexCommand('index', this.tableNameRaw, columns);
     const cols = this.formatter.columnize(columns);
     this.pushQuery(`CREATE INDEX ${name} ON ${this.tableName()} (${cols})`);
   }
 
   dropIndex(columns, indexName) {
     // DB2: DROP INDEX name — no ON table clause
-    const name = indexName
-      ? this.formatter.wrap(indexName)
-      : this._indexCommand('index', this.tableNameRaw, columns);
+    const name = indexName ? this.formatter.wrap(indexName) : this._indexCommand('index', this.tableNameRaw, columns);
     this.pushQuery(`DROP INDEX ${name}`);
   }
 
   dropUnique(columns, indexName) {
-    const name = indexName
-      ? this.formatter.wrap(indexName)
-      : this._indexCommand('unique', this.tableNameRaw, columns);
+    const name = indexName ? this.formatter.wrap(indexName) : this._indexCommand('unique', this.tableNameRaw, columns);
     this.pushQuery(`DROP INDEX ${name}`);
   }
 
   dropForeign(columns, indexName) {
-    const name = indexName
-      ? this.formatter.wrap(indexName)
-      : this._indexCommand('foreign', this.tableNameRaw, columns);
-    this.pushQuery(
-      `ALTER TABLE ${this.tableName()} DROP FOREIGN KEY ${name}`
-    );
+    const name = indexName ? this.formatter.wrap(indexName) : this._indexCommand('foreign', this.tableNameRaw, columns);
+    this.pushQuery(`ALTER TABLE ${this.tableName()} DROP FOREIGN KEY ${name}`);
   }
 
   dropPrimary(constraintName) {
@@ -149,5 +165,11 @@ Db2TableCompiler.prototype.lowerCase = false;
 Db2TableCompiler.prototype.addColumnsPrefix = 'ADD COLUMN ';
 Db2TableCompiler.prototype.alterColumnsPrefix = 'ALTER COLUMN ';
 Db2TableCompiler.prototype.dropColumnPrefix = 'DROP COLUMN ';
+// Process unique constraints inline inside CREATE TABLE so that
+// DB2 z/OS does not need a separate CREATE UNIQUE INDEX statement.
+// Primary key columns are handled in createQuery() by emitting a
+// CREATE UNIQUE INDEX followed by ALTER TABLE ADD CONSTRAINT PRIMARY KEY
+// after the CREATE TABLE — the two-statement sequence required by DB2.
+Db2TableCompiler.prototype.createAlterTableMethods = ['unique'];
 
 module.exports = { Db2TableCompiler };

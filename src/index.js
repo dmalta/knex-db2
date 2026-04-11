@@ -8,7 +8,7 @@ const {
   isRetryableError,
   DB2_ERROR_MAP,
   ERROR_CATEGORY,
-  ERROR_CATEGORIES
+  ERROR_CATEGORIES,
 } = require('./db2-errors');
 
 module.exports = Db2Client;

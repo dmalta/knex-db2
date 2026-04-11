@@ -215,10 +215,9 @@ const REL_TABLE = `KNEX_IT_REL_${ts}`;
         await db(truncTable).insert([
           { val: 'c' },
         ]);
-        // DELETE as universal alternative to TRUNCATE
-        await db(truncTable).delete();
-        const result = await db(truncTable).count('* as cnt');
-        const cnt = parseInt(result[0].CNT || result[0].cnt, 10);
+        await db(truncTable).truncate();
+        const result = await db(truncTable).select(db.raw('COALESCE(COUNT(*), 0) as ROW_COUNT')).first();
+        const cnt = parseInt(result.ROW_COUNT, 10);
         expect(cnt).toBe(0);
       } finally {
         try { await db.schema.dropTableIfExists(truncTable); } catch (e) { console.warn('Cleanup warning:', e.message); }

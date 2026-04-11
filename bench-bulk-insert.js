@@ -17,7 +17,7 @@
 'use strict';
 
 const ibmdb = require('ibm_db');
-const config = require('./src/__tests__/integration/db2-config.json');
+const config = require('./tests/integration/db2-config.json');
 
 const ROWS = 500;   // keep runs manageable; serial inserts are ~130ms/row over WAN
 const TABLE = 'BENCH_BULK';  // unqualified — resolved via CURRENTSCHEMA=KNEXTEST

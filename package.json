@@ -24,8 +24,8 @@
   "scripts": {
     "test": "vitest run",
     "test:unit": "vitest run unit",
-    "test:integration": "vitest run integration",
-    "test:real": "DB2_REAL_TEST=true vitest run integration",
+    "test:integration": "vitest run --config vitest.config.integration.js",
+    "test:real": "vitest run --config vitest.config.integration.js",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/**/*.js",

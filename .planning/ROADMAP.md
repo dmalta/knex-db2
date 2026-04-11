@@ -40,5 +40,5 @@ Requirements:
 - BULK-03: Unit tests covering multi-row ARRAY params, single-row bypass, and fallback when `connection.query` is absent
 
 Plans:
-- [ ] 03-01-PLAN.md — Compiler insert() override + client fast path (Wave 1)
-- [ ] 03-02-PLAN.md — Bulk insert unit tests (Wave 2)
+- [x] 03-01-PLAN.md — Compiler insert() override + client fast path (Wave 1)
+- [x] 03-02-PLAN.md — Bulk insert unit tests (Wave 2)

@@ -15,8 +15,8 @@ const { Db2QueryCompiler } = require('./query/db2-querycompiler');
 const { Db2ColumnCompiler } = require('./schema/db2-columncompiler');
 const { handleDB2Error, DB2_ERROR_MAP } = require('./db2-errors');
 const { Db2SchemaCompiler } = require('./schema/db2-schemacompiler');
-const { Db2TableCompiler }  = require('./schema/db2-tablecompiler');
-const { Db2Transaction }    = require('./transaction');
+const { Db2TableCompiler } = require('./schema/db2-tablecompiler');
+const { Db2Transaction } = require('./transaction');
 
 // Add DB2-specific tablespace() method to the table builder callback API.
 // Usage: db.schema.createTable(name, (t) => { t.tablespace('SCHEMA.TSNAME'); ... })
@@ -196,6 +196,31 @@ class Db2Client extends Client {
     });
   }
 
+  // Execute a multi-row INSERT using ibm_db's column-wise ARRAY parameter mechanism.
+  // Transposes row-major values[][] to column-major ARRAY params and calls
+  // connection.query() in a single round-trip — no prepare/executeNonQuery needed.
+  _executeBulkInsert(connection, obj) {
+    const { columns, values } = obj.__db2BulkInsert;
+    const numRows = values.length;
+
+    // Transpose row-major values[][] → column-major ARRAY params.
+    // DataType: 1 (SQL_CHAR) is used for all columns — ibm_db coerces automatically.
+    const params = columns.map((_, colIdx) => ({
+      ParamType: 'ARRAY',
+      DataType: 1,
+      Data: values.map((row) => row[colIdx]),
+    }));
+
+    return new Promise((resolve, reject) => {
+      connection.query({ sql: obj.sql, params, ArraySize: numRows }, (err) => {
+        if (err) return reject(this.handleError(err, obj.sql));
+        obj.response = [];
+        obj.rowCount = numRows;
+        resolve(obj);
+      });
+    });
+  }
+
   // Execute a DML statement (INSERT/UPDATE/DELETE/MERGE) — no result set expected.
   // Handles positive SQLCODE warnings by invalidating the connection.
   async _executeDML(connection, stmt, obj) {
@@ -217,7 +242,9 @@ class Db2Client extends Client {
       }
       throw this.handleError(execErr, obj.sql, obj.bindings);
     } finally {
-      try { stmt.closeSync(); } catch {}
+      try {
+        stmt.closeSync();
+      } catch {}
     }
   }
 
@@ -229,9 +256,21 @@ class Db2Client extends Client {
       obj.rowCount = 0;
       return obj;
     } catch (execErr) {
+      // suppressIfNotFound: silently succeed when the object does not exist
+      // (e.g. dropTableIfExists on a table that was already dropped — SQL0204N).
+      if (obj.suppressIfNotFound) {
+        const code = execErr.sqlcode || execErr.code;
+        if (code === -204 || code === '-204') {
+          obj.response = [];
+          obj.rowCount = 0;
+          return obj;
+        }
+      }
       throw this.handleError(execErr, obj.sql, obj.bindings);
     } finally {
-      try { stmt.closeSync(); } catch {}
+      try {
+        stmt.closeSync();
+      } catch {}
     }
   }
 
@@ -241,7 +280,9 @@ class Db2Client extends Client {
     try {
       result = await stmt.execute(obj.bindings || []);
     } catch (execErr) {
-      try { stmt.closeSync(); } catch {}
+      try {
+        stmt.closeSync();
+      } catch {}
       throw this.handleError(execErr, obj.sql, obj.bindings);
     }
     try {
@@ -252,8 +293,12 @@ class Db2Client extends Client {
     } catch (fetchErr) {
       throw this.handleError(fetchErr, obj.sql, obj.bindings);
     } finally {
-      try { result.closeSync(); } catch {}
-      try { stmt.closeSync(); } catch {}
+      try {
+        result.closeSync();
+      } catch {}
+      try {
+        stmt.closeSync();
+      } catch {}
     }
   }
 
@@ -262,34 +307,14 @@ class Db2Client extends Client {
   async query(connection, obj) {
     if (!obj.sql) throw new Error('The query is empty');
 
-    // --- Bulk insert fast path (ibm_db column-wise ARRAY params) ---
+    // If connection.query is absent, fall through to prepare/executeNonQuery below.
     if (obj.__db2BulkInsert && typeof connection.query === 'function') {
-      const { columns, values } = obj.__db2BulkInsert;
-      const numRows = values.length;
-
-      // Transpose row-major values[][] → column-major ARRAY params.
-      // DataType: 1 (SQL_CHAR) is used for all columns — ibm_db coerces automatically.
-      const params = columns.map((_, colIdx) => ({
-        ParamType: 'ARRAY',
-        DataType: 1,
-        Data: values.map((row) => row[colIdx]),
-      }));
-
-      return new Promise((resolve, reject) => {
-        connection.query({ sql: obj.sql, params, ArraySize: numRows }, (err) => {
-          if (err) return reject(this.handleError(err, obj.sql));
-          obj.response = [];
-          obj.rowCount = numRows;
-          resolve(obj);
-        });
-      });
+      return this._executeBulkInsert(connection, obj);
     }
-    // If __db2BulkInsert is set but connection.query is not available, fall through
-    // to the serial path below (prepare/executeNonQuery handles it row by row).
-    // --- end bulk fast path ---
 
     const sqlTrimmed = obj.sql.trim().toLowerCase();
     const isDML = /^(insert|update|delete|merge)\b/.test(sqlTrimmed);
+    const isDDL = /^(create|drop|alter|truncate|rename|comment|grant|revoke)\b/.test(sqlTrimmed);
 
     const executeQuery = async () => {
       let stmt;
@@ -301,7 +326,7 @@ class Db2Client extends Client {
 
       if (isDML) {
         return this._executeDML(connection, stmt, obj);
-      } else if (/^(create|drop|alter|truncate|rename|comment|grant|revoke)\b/.test(sqlTrimmed)) {
+      } else if (isDDL) {
         return this._executeDDL(stmt, obj);
       } else {
         return this._executeQuery(stmt, obj);
@@ -315,7 +340,7 @@ class Db2Client extends Client {
         new Promise((_, reject) =>
           setTimeout(
             () => reject(new Error(`Query timeout after ${queryTimeout}ms: ${obj.sql.substring(0, 100)}...`)),
-            queryTimeout,
+            queryTimeout
           )
         ),
       ]);
