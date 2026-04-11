@@ -98,3 +98,52 @@ describe('DB2 Schema Compiler Unit Tests', () => {
     });
   });
 });
+
+describe('Db2SchemaCompiler', () => {
+  let db;
+
+  beforeAll(() => {
+    const knex = require('knex');
+    const Db2Client = require('../../client');
+    db = knex({ client: Db2Client, connection: {} });
+  });
+
+  afterAll(() => db.destroy());
+
+  test('hasTable() generates SYSIBM.SYSTABLES query with bound table name', () => {
+    const sc = db.client.schemaCompiler(db.schema);
+    sc.hasTable('MYTABLE');
+    const q = sc.sequence[0];
+    expect(q.sql).toContain('SYSIBM.SYSTABLES');
+    expect(q.sql).toContain('?');
+    expect(q.bindings[0]).toBe('MYTABLE');
+  });
+
+  test('hasTable() uppercases the table name', () => {
+    const sc = db.client.schemaCompiler(db.schema);
+    sc.hasTable('mytable');
+    expect(sc.sequence[0].bindings[0]).toBe('MYTABLE');
+  });
+
+  test('hasColumn() generates SYSIBM.SYSCOLUMNS query with bound table+column', () => {
+    const sc = db.client.schemaCompiler(db.schema);
+    sc.hasColumn('MYTABLE', 'MYCOL');
+    const q = sc.sequence[0];
+    expect(q.sql).toContain('SYSIBM.SYSCOLUMNS');
+    expect(q.bindings[0]).toBe('MYTABLE');
+    expect(q.bindings[1]).toBe('MYCOL');
+  });
+
+  test('renameTable() emits RENAME TABLE old TO new', () => {
+    const sc = db.client.schemaCompiler(db.schema);
+    sc.renameTable('OLD', 'NEW');
+    const stmt = sc.sequence[0];
+    const sql = stmt.sql || stmt;
+    expect(sql).toMatch(/RENAME TABLE OLD TO NEW/i);
+  });
+
+  test('createSchemaIfNotExists() throws with db2-zos message', () => {
+    const sc = db.client.schemaCompiler(db.schema);
+    expect(() => sc.createSchemaIfNotExists('MYSCHEMA')).toThrow('db2-zos');
+  });
+});
