@@ -225,4 +225,112 @@ describe('DB2 Client Unit Tests', () => {
       });
     });
   });
+
+  describe('bulk insert fast path', () => {
+    function makeBulkObj() {
+      return {
+        sql: 'insert into users (id, name) values (?, ?)',
+        bindings: [],
+        __db2BulkInsert: {
+          columns: ['id', 'name'],
+          values: [
+            [1, 'Alice'],
+            [2, 'Bob'],
+          ],
+        },
+      };
+    }
+
+    test('multi-row insert calls connection.query with ArraySize and column-wise ARRAY params', async () => {
+      const conn = {
+        __knex__disposed: false,
+        query: vi.fn((opts, cb) => cb(null)),
+        prepare: vi.fn(),
+        close: vi.fn(),
+      };
+
+      const bulkObj = makeBulkObj();
+      const result = await client.query(conn, bulkObj);
+
+      // Fast path must call connection.query exactly once
+      expect(conn.query).toHaveBeenCalledTimes(1);
+      expect(conn.prepare).not.toHaveBeenCalled();
+
+      const callArg = conn.query.mock.calls[0][0];
+      expect(callArg.ArraySize).toBe(2);
+      expect(callArg.sql).toBe('insert into users (id, name) values (?, ?)');
+
+      // Column 0: id
+      expect(callArg.params[0]).toMatchObject({
+        ParamType: 'ARRAY',
+        DataType: 1,
+        Data: [1, 2],
+      });
+
+      // Column 1: name
+      expect(callArg.params[1]).toMatchObject({
+        ParamType: 'ARRAY',
+        DataType: 1,
+        Data: ['Alice', 'Bob'],
+      });
+
+      expect(result.response).toEqual([]);
+      expect(result.rowCount).toBe(2);
+    });
+
+    test('single-row insert does NOT hit the fast path', async () => {
+      const conn = {
+        __knex__disposed: false,
+        prepare: vi.fn((sql) =>
+          Promise.resolve({
+            executeNonQuery: vi.fn(() => Promise.resolve(1)),
+            closeSync: vi.fn(),
+          })
+        ),
+        query: vi.fn(),
+        close: vi.fn(),
+      };
+
+      // Plain single-row obj — no __db2BulkInsert property
+      const singleObj = {
+        sql: 'insert into users (id, name) values (?, ?)',
+        bindings: [3, 'Carol'],
+      };
+
+      const result = await client.query(conn, singleObj);
+
+      expect(conn.query).not.toHaveBeenCalled();
+      expect(conn.prepare).toHaveBeenCalledTimes(1);
+      expect(result.rowCount).toBe(1);
+      expect(result.response).toEqual([]);
+    });
+
+    test('fallback to serial path when connection.query is absent', async () => {
+      const conn = {
+        __knex__disposed: false,
+        prepare: vi.fn((sql) =>
+          Promise.resolve({
+            executeNonQuery: vi.fn(() => Promise.resolve(2)),
+            closeSync: vi.fn(),
+          })
+        ),
+        // connection.query intentionally absent
+        close: vi.fn(),
+      };
+
+      const bulkObj = {
+        sql: 'insert into users (id, name) values (?, ?)',
+        bindings: [],
+        __db2BulkInsert: {
+          columns: ['id', 'name'],
+          values: [[4, 'Dave'], [5, 'Eve']],
+        },
+      };
+
+      // Should not throw — falls through to prepare/executeNonQuery
+      const result = await client.query(conn, bulkObj);
+      expect(conn.prepare).toHaveBeenCalledTimes(1);
+      expect(result.rowCount).toBe(2);
+    });
+  });
 });
