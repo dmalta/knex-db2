@@ -72,6 +72,93 @@ describe('Db2TableCompiler', () => {
     );
     expect(sql).toMatch(/COMMENT ON TABLE users IS 'Users table'/i);
   });
+
+  test('createTableLike() emits CREATE TABLE AS (SELECT * FROM old) WITH NO DATA', () => {
+    const stmts = db.schema.createTableLike('users_copy', 'users').toSQL();
+    const sqls = stmts.map((s) => s.sql || s);
+    const createTableAs = sqls.find((s) => /CREATE TABLE users_copy.*AS.*SELECT.*FROM users.*WITH NO DATA/i.test(s));
+    expect(createTableAs).toBeTruthy();
+  });
+
+  test('createTable with tablespace option appends IN <tablespace>', () => {
+    const stmts = ddl((t) => {
+      t.integer('id');
+      t.tablespace('TS_MAIN');
+    });
+    const sqls = stmts.map((s) => s.sql || s);
+    const createTable = sqls.find((s) => /CREATE TABLE/i.test(s));
+    expect(createTable).toMatch(/IN TS_MAIN$/i);
+  });
+
+  test('unique() emits CONSTRAINT during CREATE TABLE', () => {
+    const stmts = ddl((t) => {
+      t.integer('id');
+      t.string('email').unique('idx_email_unique');
+    });
+    const sqls = stmts.map((s) => s.sql || s);
+    const createTable = sqls.find((s) => /CREATE TABLE/i.test(s));
+    expect(createTable).toMatch(/CONSTRAINT/i);
+    expect(createTable).toMatch(/UNIQUE/i);
+  });
+
+  test('unique() via alter emits CREATE UNIQUE INDEX', () => {
+    const sql = joinSql(alter((t) => {
+      t.string('email').unique('idx_email_unique');
+    }));
+    expect(sql).toMatch(/CREATE UNIQUE INDEX idx_email_unique ON users/i);
+  });
+
+  test('dropUnique() emits DROP INDEX without ON table clause', () => {
+    const sql = joinSql(alter((t) => t.dropUnique(['email'], 'idx_email_unique')));
+    expect(sql).toMatch(/DROP INDEX idx_email_unique/i);
+    expect(sql).not.toMatch(/ON users/i);
+  });
+
+  test('dropForeign() emits ALTER TABLE DROP FOREIGN KEY', () => {
+    const sql = joinSql(alter((t) => t.dropForeign(['org_id'], 'fk_org')));
+    expect(sql).toMatch(/ALTER TABLE users DROP FOREIGN KEY fk_org/i);
+  });
+
+  test('dropPrimary() emits ALTER TABLE DROP PRIMARY KEY', () => {
+    const sql = joinSql(alter((t) => t.dropPrimary()));
+    expect(sql).toMatch(/ALTER TABLE users DROP PRIMARY KEY/i);
+  });
+
+  test('alterColumns sets NOT NULL via .notNullable().alter()', () => {
+    const stmts = alter((t) => {
+      t.integer('age').notNullable().alter();
+    });
+    const sqls = stmts.map((s) => s.sql || s);
+    const alterCol = sqls.find((s) => /ALTER COLUMN age.*SET NOT NULL/i.test(s));
+    expect(alterCol).toBeTruthy();
+  });
+
+  test('alterColumns drops NOT NULL via .nullable().alter()', () => {
+    const stmts = alter((t) => {
+      t.integer('age').nullable().alter();
+    });
+    const sqls = stmts.map((s) => s.sql || s);
+    const alterCol = sqls.find((s) => /ALTER COLUMN age.*DROP NOT NULL/i.test(s));
+    expect(alterCol).toBeTruthy();
+  });
+
+  test('alterColumns sets DEFAULT via .defaultTo(val).alter()', () => {
+    const stmts = alter((t) => {
+      t.string('status').defaultTo('active').alter();
+    });
+    const sqls = stmts.map((s) => s.sql || s);
+    const alterCol = sqls.find((s) => /ALTER COLUMN status.*SET DEFAULT 'active'/i.test(s));
+    expect(alterCol).toBeTruthy();
+  });
+
+  test('alterColumns drops DEFAULT via .defaultTo(null).alter()', () => {
+    const stmts = alter((t) => {
+      t.integer('priority').defaultTo(null).alter();
+    });
+    const sqls = stmts.map((s) => s.sql || s);
+    const alterCol = sqls.find((s) => /ALTER COLUMN priority.*DROP DEFAULT/i.test(s));
+    expect(alterCol).toBeTruthy();
+  });
 });
 
 describe('Db2Transaction', () => {
@@ -96,6 +183,16 @@ describe('Db2Transaction', () => {
     expect(result).toBe('result-value');
   });
 
+    test('commit() with context that has _resolver calls it', async () => {
+      const resolverSpy = vi.fn();
+      const ctx = { _resolver: resolverSpy, _completed: false };
+      const result = await Db2Transaction.prototype.commit.call(ctx, mockConnection, 'my-value');
+      expect(mockConnection.commitTransaction).toHaveBeenCalledTimes(1);
+      expect(resolverSpy).toHaveBeenCalledWith('my-value');
+      expect(ctx._completed).toBe(true);
+      expect(result).toBe('my-value');
+    });
+
   test('rollback() calls connection.rollbackTransaction and resolves with original error', async () => {
     const originalError = new Error('original');
     const result = await Db2Transaction.prototype.rollback.call(null, mockConnection, originalError);
@@ -109,6 +206,37 @@ describe('Db2Transaction', () => {
     const result = await Db2Transaction.prototype.rollback.call(null, mockConnection, originalError);
     expect(result).toBe(originalError);
   });
+
+    test('rollback() with context that has _rejecter calls it on error', async () => {
+      const rejecterSpy = vi.fn();
+      const ctx = { _resolver: vi.fn(), _rejecter: rejecterSpy, _completed: false };
+      const testError = new Error('test-error');
+      const result = await Db2Transaction.prototype.rollback.call(ctx, mockConnection, testError);
+      expect(rejecterSpy).toHaveBeenCalledWith(testError);
+      expect(ctx._completed).toBe(true);
+      expect(result).toBe(testError);
+    });
+
+    test('rollback() with context calls _resolver when doNotRejectOnRollback is true', async () => {
+      const resolverSpy = vi.fn();
+      const rejecterSpy = vi.fn();
+      const ctx = { _resolver: resolverSpy, _rejecter: rejecterSpy, _completed: false, doNotRejectOnRollback: true };
+      const result = await Db2Transaction.prototype.rollback.call(ctx, mockConnection, null);
+      expect(resolverSpy).toHaveBeenCalled();
+      expect(rejecterSpy).not.toHaveBeenCalled();
+      expect(ctx._completed).toBe(true);
+      expect(result).toBeNull();
+    });
+
+    test('rollback() with context calls _rejecter with default error when no error passed', async () => {
+      const rejecterSpy = vi.fn();
+      const ctx = { _resolver: vi.fn(), _rejecter: rejecterSpy, _completed: false };
+      const result = await Db2Transaction.prototype.rollback.call(ctx, mockConnection, undefined);
+      expect(rejecterSpy).toHaveBeenCalled();
+      const errorArg = rejecterSpy.mock.calls[0][0];
+      expect(errorArg).toBeInstanceOf(Error);
+      expect(errorArg.message).toContain('Transaction rejected');
+    });
 
   test('begin() rejects if beginTransaction returns error', async () => {
     mockConnection.beginTransaction = vi.fn(() => Promise.reject(new Error('begin failed')));
@@ -148,6 +276,48 @@ describe('Db2Transaction', () => {
       const ctx = { client: { config: { isolationLevel: 2 } } };
       // mockConnection has no setIsolationLevel — should not throw
       await expect(Db2Transaction.prototype.begin.call(ctx, mockConnection)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('Savepoint methods', () => {
+    test('savepoint() calls this.query with SAVEPOINT <txid> ON ROLLBACK RETAIN CURSORS', async () => {
+      const querySpy = vi.fn(() => Promise.resolve());
+      const ctx = { txid: 'tx_sp1', query: querySpy };
+      await Db2Transaction.prototype.savepoint.call(ctx, mockConnection);
+      expect(querySpy).toHaveBeenCalledTimes(1);
+      const [conn, sql] = querySpy.mock.calls[0];
+      expect(sql).toBe('SAVEPOINT tx_sp1 ON ROLLBACK RETAIN CURSORS');
+    });
+
+    test('release() calls this.query with RELEASE SAVEPOINT <txid>', async () => {
+      const querySpy = vi.fn(() => Promise.resolve());
+      const ctx = { txid: 'tx_sp1', query: querySpy };
+      const testValue = { inserted: 1 };
+      await Db2Transaction.prototype.release.call(ctx, mockConnection, testValue);
+      expect(querySpy).toHaveBeenCalledTimes(1);
+      const [conn, sql, level, value] = querySpy.mock.calls[0];
+      expect(sql).toBe('RELEASE SAVEPOINT tx_sp1');
+      expect(level).toBe(1);
+      expect(value).toBe(testValue);
+    });
+
+    test('rollbackTo() calls this.query with ROLLBACK TO SAVEPOINT <txid>', async () => {
+      const querySpy = vi.fn(() => Promise.resolve());
+      const ctx = { txid: 'tx_sp1', query: querySpy };
+      const testError = new Error('rollback test');
+      await Db2Transaction.prototype.rollbackTo.call(ctx, mockConnection, testError);
+      expect(querySpy).toHaveBeenCalledTimes(1);
+      const [conn, sql, level, error] = querySpy.mock.calls[0];
+      expect(sql).toBe('ROLLBACK TO SAVEPOINT tx_sp1');
+      expect(level).toBe(2);
+      expect(error).toBe(testError);
+    });
+
+    test('savepoint() with different txid values emits correct SQL', async () => {
+      const querySpy = vi.fn(() => Promise.resolve());
+      const ctx = { txid: 'tx_test_123', query: querySpy };
+      await Db2Transaction.prototype.savepoint.call(ctx, mockConnection);
+      expect(querySpy).toHaveBeenCalledWith(mockConnection, 'SAVEPOINT tx_test_123 ON ROLLBACK RETAIN CURSORS');
     });
   });
 });
