@@ -50,10 +50,10 @@ class Db2QueryCompiler extends QueryCompiler {
     return 'FOR FETCH ONLY';
   }
 
-  // DB2 z/OS V9+: TRUNCATE TABLE t
+  // DB2 z/OS V9+: TRUNCATE TABLE t IMMEDIATE
   truncate() {
     return {
-      sql: `TRUNCATE TABLE ${this.tableName}`,
+      sql: `TRUNCATE TABLE ${this.tableName} IMMEDIATE`,
     };
   }
 
