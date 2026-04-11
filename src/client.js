@@ -352,7 +352,7 @@ class Db2Client extends Client {
   // Stream query results progressively using ibm_db's queryStream API.
   // Returns a Node.js Readable stream — rows are emitted one by one without
   // buffering the full result set in memory.
-  stream(connection, obj, stream, options) {
+  stream(connection, obj, stream, _options) {
     const readable = connection.queryStream(obj.sql, obj.bindings || []);
     return readable.pipe(stream);
   }

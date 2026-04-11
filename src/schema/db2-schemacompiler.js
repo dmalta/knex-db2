@@ -43,7 +43,7 @@ class Db2SchemaCompiler extends SchemaCompiler {
     this.pushQuery(`RENAME TABLE ${schemaPrefix}${from} TO ${to}`);
   }
 
-  dropTableIfExists(tableName) {
+  dropTableIfExists(_tableName) {
     throw new Error(
       'DROP TABLE IF EXISTS is not supported — use dropTable() and handle SQL0204N (object not found) in your application'
     );
@@ -53,7 +53,7 @@ class Db2SchemaCompiler extends SchemaCompiler {
     this.pushQuery(`CREATE SCHEMA ${schemaName}`);
   }
 
-  createSchemaIfNotExists(schemaName) {
+  createSchemaIfNotExists(_schemaName) {
     throw new Error(
       'CREATE SCHEMA IF NOT EXISTS is not supported — use createSchema() and handle errors in your application'
     );
@@ -64,7 +64,7 @@ class Db2SchemaCompiler extends SchemaCompiler {
     this.pushQuery(`DROP SCHEMA ${schemaName} ${qualifier}`);
   }
 
-  dropSchemaIfExists(schemaName, cascade) {
+  dropSchemaIfExists(_schemaName, _cascade) {
     throw new Error('DROP SCHEMA IF EXISTS is not supported — use dropSchema() and handle errors in your application');
   }
 }

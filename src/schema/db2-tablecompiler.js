@@ -126,7 +126,7 @@ class Db2TableCompiler extends TableCompiler {
     }
   }
 
-  index(columns, indexName, options) {
+  index(columns, indexName, _options) {
     const name = indexName ? this.formatter.wrap(indexName) : this._indexCommand('index', this.tableNameRaw, columns);
     const cols = this.formatter.columnize(columns);
     this.pushQuery(`CREATE INDEX ${name} ON ${this.tableName()} (${cols})`);
@@ -148,7 +148,7 @@ class Db2TableCompiler extends TableCompiler {
     this.pushQuery(`ALTER TABLE ${this.tableName()} DROP FOREIGN KEY ${name}`);
   }
 
-  dropPrimary(constraintName) {
+  dropPrimary(_constraintName) {
     // DB2 allows only one PK per table — DROP PRIMARY KEY requires no name
     this.pushQuery(`ALTER TABLE ${this.tableName()} DROP PRIMARY KEY`);
   }

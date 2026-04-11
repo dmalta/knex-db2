@@ -33,7 +33,7 @@ module.exports = [
       },
     },
     rules: {
-      'no-unused-vars': 'error',
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       'no-explicit-any': 'off',
       'no-undef': 'error',
       'no-trailing-spaces': 'error',
