@@ -1,4 +1,5 @@
 const Client = require('knex/lib/client');
+const TableBuilder = require('knex/lib/schema/tablebuilder');
 let db2;
 try {
   db2 = require('ibm_db');
@@ -16,6 +17,13 @@ const { handleDB2Error, DB2_ERROR_MAP } = require('./db2-errors');
 const { Db2SchemaCompiler } = require('./schema/db2-schemacompiler');
 const { Db2TableCompiler }  = require('./schema/db2-tablecompiler');
 const { Db2Transaction }    = require('./transaction');
+
+// Add DB2-specific tablespace() method to the table builder callback API.
+// Usage: db.schema.createTable(name, (t) => { t.tablespace('SCHEMA.TSNAME'); ... })
+TableBuilder.extend('tablespace', function (tablespaceName) {
+  this._single.tablespace = tablespaceName;
+  return this;
+});
 
 class Db2Client extends Client {
   constructor(config = {}) {
@@ -188,13 +196,99 @@ class Db2Client extends Client {
     });
   }
 
+  // Execute a DML statement (INSERT/UPDATE/DELETE/MERGE) — no result set expected.
+  // Handles positive SQLCODE warnings by invalidating the connection.
+  async _executeDML(connection, stmt, obj) {
+    try {
+      const affectedRows = await stmt.executeNonQuery(obj.bindings || []);
+      obj.response = [];
+      obj.rowCount = typeof affectedRows === 'number' ? affectedRows : 0;
+      return obj;
+    } catch (execErr) {
+      // Positive SQLCODE = DB2 warning (e.g. +513 whole-table DELETE) — operation succeeded.
+      // Invalidate the connection so the pool creates a fresh one: ibm_db leaves the ODBC
+      // handle in a "warning pending" state that can corrupt subsequent queries.
+      const sqlCode = execErr.sqlcode || execErr.code;
+      if (typeof sqlCode === 'number' && sqlCode > 0) {
+        connection.__knex__disposed = true;
+        obj.response = [];
+        obj.rowCount = 0;
+        return obj;
+      }
+      throw this.handleError(execErr, obj.sql, obj.bindings);
+    } finally {
+      try { stmt.closeSync(); } catch {}
+    }
+  }
+
+  // Execute a DDL statement (CREATE/DROP/ALTER/TRUNCATE/…) — no result set or row count.
+  async _executeDDL(stmt, obj) {
+    try {
+      await stmt.executeNonQuery(obj.bindings || []);
+      obj.response = [];
+      obj.rowCount = 0;
+      return obj;
+    } catch (execErr) {
+      throw this.handleError(execErr, obj.sql, obj.bindings);
+    } finally {
+      try { stmt.closeSync(); } catch {}
+    }
+  }
+
+  // Execute a SELECT (or other result-returning) query and fetch all rows.
+  async _executeQuery(stmt, obj) {
+    let result;
+    try {
+      result = await stmt.execute(obj.bindings || []);
+    } catch (execErr) {
+      try { stmt.closeSync(); } catch {}
+      throw this.handleError(execErr, obj.sql, obj.bindings);
+    }
+    try {
+      const rows = result.fetchAllSync() || [];
+      obj.response = rows;
+      obj.rowCount = rows.length;
+      return obj;
+    } catch (fetchErr) {
+      throw this.handleError(fetchErr, obj.sql, obj.bindings);
+    } finally {
+      try { result.closeSync(); } catch {}
+      try { stmt.closeSync(); } catch {}
+    }
+  }
+
   // Execute query using DB2 with enhanced error handling.
   // Uses ibm_db's native Promise support (no callback passed → Promise returned).
   async query(connection, obj) {
     if (!obj.sql) throw new Error('The query is empty');
 
+    // --- Bulk insert fast path (ibm_db column-wise ARRAY params) ---
+    if (obj.__db2BulkInsert && typeof connection.query === 'function') {
+      const { columns, values } = obj.__db2BulkInsert;
+      const numRows = values.length;
+
+      // Transpose row-major values[][] → column-major ARRAY params.
+      // DataType: 1 (SQL_CHAR) is used for all columns — ibm_db coerces automatically.
+      const params = columns.map((_, colIdx) => ({
+        ParamType: 'ARRAY',
+        DataType: 1,
+        Data: values.map((row) => row[colIdx]),
+      }));
+
+      return new Promise((resolve, reject) => {
+        connection.query({ sql: obj.sql, params, ArraySize: numRows }, (err) => {
+          if (err) return reject(this.handleError(err, obj.sql));
+          obj.response = [];
+          obj.rowCount = numRows;
+          resolve(obj);
+        });
+      });
+    }
+    // If __db2BulkInsert is set but connection.query is not available, fall through
+    // to the serial path below (prepare/executeNonQuery handles it row by row).
+    // --- end bulk fast path ---
+
     const sqlTrimmed = obj.sql.trim().toLowerCase();
-    // DML statements don't produce a result set — use executeNonQuery for efficiency
     const isDML = /^(insert|update|delete|merge)\b/.test(sqlTrimmed);
 
     const executeQuery = async () => {
@@ -206,34 +300,11 @@ class Db2Client extends Client {
       }
 
       if (isDML) {
-        try {
-          const affectedRows = await stmt.executeNonQuery(obj.bindings || []);
-          return {
-            response: [],
-            rowCount: typeof affectedRows === 'number' ? affectedRows : 0,
-          };
-        } catch (execErr) {
-          throw this.handleError(execErr, obj.sql, obj.bindings);
-        } finally {
-          try { stmt.closeSync(); } catch {}
-        }
+        return this._executeDML(connection, stmt, obj);
+      } else if (/^(create|drop|alter|truncate|rename|comment|grant|revoke)\b/.test(sqlTrimmed)) {
+        return this._executeDDL(stmt, obj);
       } else {
-        let result;
-        try {
-          result = await stmt.execute(obj.bindings || []);
-        } catch (execErr) {
-          try { stmt.closeSync(); } catch {}
-          throw this.handleError(execErr, obj.sql, obj.bindings);
-        }
-        try {
-          const rows = result.fetchAllSync() || [];
-          return { response: rows, rowCount: rows.length };
-        } catch (fetchErr) {
-          throw this.handleError(fetchErr, obj.sql, obj.bindings);
-        } finally {
-          try { result.closeSync(); } catch {}
-          try { stmt.closeSync(); } catch {}
-        }
+        return this._executeQuery(stmt, obj);
       }
     };
 
