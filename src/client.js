@@ -13,6 +13,9 @@ try {
 const { Db2QueryCompiler } = require('./query/db2-querycompiler');
 const { Db2ColumnCompiler } = require('./schema/db2-columncompiler');
 const { handleDB2Error, DB2_ERROR_MAP } = require('./db2-errors');
+const { Db2SchemaCompiler } = require('./schema/db2-schemacompiler');
+const { Db2TableCompiler }  = require('./schema/db2-tablecompiler');
+const { Db2Transaction }    = require('./transaction');
 
 class Db2Client extends Client {
   constructor(config = {}) {
@@ -32,19 +35,19 @@ class Db2Client extends Client {
   }
 
   schemaCompiler() {
-    // TODO: Implement DB2-specific schema compiler for future refinements
-    // such as DB2-specific DDL syntax, constraints, and schema operations
-    return super.schemaCompiler(...arguments);
+    return new Db2SchemaCompiler(this, ...arguments);
   }
 
   tableCompiler() {
-    // TODO: Implement DB2-specific table compiler for future refinements
-    // such as DB2-specific table options, partitioning, and storage parameters
-    return super.tableCompiler(...arguments);
+    return new Db2TableCompiler(this, ...arguments);
   }
 
   columnCompiler() {
     return new Db2ColumnCompiler(this, ...arguments);
+  }
+
+  transaction() {
+    return new Db2Transaction(this, ...arguments);
   }
 
   wrapIdentifierImpl(value) {
