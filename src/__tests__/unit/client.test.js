@@ -131,4 +131,98 @@ describe('DB2 Client Unit Tests', () => {
       expect(tableCompilerClass).toBeDefined();
     });
   });
+
+  describe('query DML path (executeNonQuery)', () => {
+    function makeConnection({ dmlAffectedRows = 3 } = {}) {
+      let capturedStmt;
+      const conn = {
+        __knex__disposed: false,
+        prepare: jest.fn((sql) => {
+          capturedStmt = {
+            executeNonQuery: jest.fn((bindings) => Promise.resolve(dmlAffectedRows)),
+            execute: jest.fn((bindings) => Promise.resolve({
+              fetchAllSync: () => [],
+              getColumnMetadataSync: () => [],
+              closeSync: jest.fn(),
+            })),
+            closeSync: jest.fn(),
+          };
+          return Promise.resolve(capturedStmt);
+        }),
+        query: jest.fn(),
+        close: jest.fn(),
+      };
+      conn._getStmt = () => capturedStmt;
+      return conn;
+    }
+
+    test('INSERT uses executeNonQuery and returns rowCount', async () => {
+      const conn = makeConnection({ dmlAffectedRows: 5 });
+      const result = await client.query(conn, {
+        sql: 'INSERT INTO users (name) VALUES (?)',
+        bindings: ['Alice'],
+      });
+      expect(result.rowCount).toBe(5);
+      expect(result.response).toEqual([]);
+      const stmt = conn._getStmt();
+      expect(stmt.executeNonQuery).toHaveBeenCalledTimes(1);
+      expect(stmt.execute).not.toHaveBeenCalled();
+    });
+
+    test('UPDATE uses executeNonQuery', async () => {
+      const conn = makeConnection({ dmlAffectedRows: 2 });
+      const result = await client.query(conn, { sql: 'UPDATE users SET name=? WHERE id=?', bindings: ['Bob', 1] });
+      expect(result.rowCount).toBe(2);
+    });
+
+    test('DELETE uses executeNonQuery', async () => {
+      const conn = makeConnection({ dmlAffectedRows: 1 });
+      const result = await client.query(conn, { sql: 'DELETE FROM users WHERE id=?', bindings: [1] });
+      expect(result.rowCount).toBe(1);
+    });
+
+    test('SELECT does NOT use executeNonQuery', async () => {
+      const conn = makeConnection();
+      await client.query(conn, { sql: 'SELECT * FROM users' });
+      const stmt = conn._getStmt();
+      expect(stmt.execute).toHaveBeenCalledTimes(1);
+      expect(stmt.executeNonQuery).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('stream (queryStream)', () => {
+    test('pipes ibm_db queryStream into the provided writable stream', () => {
+      const { Readable, Writable } = require('stream');
+
+      const fakeReadable = new Readable({ objectMode: true, read() {} });
+      const connection = {
+        __knex__disposed: false,
+        queryStream: jest.fn(() => fakeReadable),
+        query: jest.fn(),
+        close: jest.fn(),
+      };
+
+      const chunks = [];
+      const dest = new Writable({
+        objectMode: true,
+        write(chunk, _enc, cb) { chunks.push(chunk); cb(); },
+      });
+
+      client.stream(connection, { sql: 'SELECT * FROM users', bindings: [] }, dest);
+
+      expect(connection.queryStream).toHaveBeenCalledWith('SELECT * FROM users', []);
+
+      // Simulate rows arriving on the readable
+      fakeReadable.push({ ID: 1 });
+      fakeReadable.push({ ID: 2 });
+      fakeReadable.push(null); // EOF
+
+      return new Promise((resolve) => {
+        dest.on('finish', () => {
+          expect(chunks).toEqual([{ ID: 1 }, { ID: 2 }]);
+          resolve();
+        });
+      });
+    });
+  });
 });

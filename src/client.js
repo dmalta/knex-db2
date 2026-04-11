@@ -188,37 +188,77 @@ class Db2Client extends Client {
     });
   }
 
-  // Execute query using DB2 with enhanced error handling
-  query(connection, obj) {
+  // Execute query using DB2 with enhanced error handling.
+  // Uses ibm_db's native Promise support (no callback passed → Promise returned).
+  async query(connection, obj) {
     if (!obj.sql) throw new Error('The query is empty');
 
-    return new Promise((resolve, reject) => {
-      const queryTimeout = this.config.connection?.queryTimeout || 30000;
-      let timeoutHandle;
+    const sqlTrimmed = obj.sql.trim().toLowerCase();
+    // DML statements don't produce a result set — use executeNonQuery for efficiency
+    const isDML = /^(insert|update|delete|merge)\b/.test(sqlTrimmed);
 
-      // Set query timeout
-      if (queryTimeout > 0) {
-        timeoutHandle = setTimeout(() => {
-          reject(new Error(`Query timeout after ${queryTimeout}ms: ${obj.sql.substring(0, 100)}...`));
-        }, queryTimeout);
+    const executeQuery = async () => {
+      let stmt;
+      try {
+        stmt = await connection.prepare(obj.sql);
+      } catch (prepErr) {
+        throw this.handleError(prepErr, obj.sql, obj.bindings);
       }
 
-      connection.query(obj.sql, obj.bindings || [], (err, result, moreResultSets) => {
-        if (timeoutHandle) clearTimeout(timeoutHandle);
-
-        if (err) {
-          const enhancedError = this.handleError(err, obj.sql, obj.bindings);
-          reject(enhancedError);
-        } else {
-          const response = {
-            response: result || [],
-            moreResultSets: moreResultSets,
-            rowCount: Array.isArray(result) ? result.length : 0,
+      if (isDML) {
+        try {
+          const affectedRows = await stmt.executeNonQuery(obj.bindings || []);
+          return {
+            response: [],
+            rowCount: typeof affectedRows === 'number' ? affectedRows : 0,
           };
-          resolve(response);
+        } catch (execErr) {
+          throw this.handleError(execErr, obj.sql, obj.bindings);
+        } finally {
+          try { stmt.closeSync(); } catch {}
         }
-      });
-    });
+      } else {
+        let result;
+        try {
+          result = await stmt.execute(obj.bindings || []);
+        } catch (execErr) {
+          try { stmt.closeSync(); } catch {}
+          throw this.handleError(execErr, obj.sql, obj.bindings);
+        }
+        try {
+          const rows = result.fetchAllSync() || [];
+          return { response: rows, rowCount: rows.length };
+        } catch (fetchErr) {
+          throw this.handleError(fetchErr, obj.sql, obj.bindings);
+        } finally {
+          try { result.closeSync(); } catch {}
+          try { stmt.closeSync(); } catch {}
+        }
+      }
+    };
+
+    const queryTimeout = this.config.connection?.queryTimeout;
+    if (queryTimeout && queryTimeout > 0) {
+      return Promise.race([
+        executeQuery(),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`Query timeout after ${queryTimeout}ms: ${obj.sql.substring(0, 100)}...`)),
+            queryTimeout,
+          )
+        ),
+      ]);
+    }
+
+    return executeQuery();
+  }
+
+  // Stream query results progressively using ibm_db's queryStream API.
+  // Returns a Node.js Readable stream — rows are emitted one by one without
+  // buffering the full result set in memory.
+  stream(connection, obj, stream, options) {
+    const readable = connection.queryStream(obj.sql, obj.bindings || []);
+    return readable.pipe(stream);
   }
 
   // Process the response as returned from the query
