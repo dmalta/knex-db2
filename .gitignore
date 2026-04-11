@@ -12,3 +12,4 @@ coverage/
 
 # Integration test config with real credentials
 src/__tests__/integration/db2-config.json
+.planning/

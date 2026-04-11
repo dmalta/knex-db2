@@ -50,9 +50,11 @@ class Db2QueryCompiler extends QueryCompiler {
     return 'FOR FETCH ONLY';
   }
 
-  // DB2 z/OS V9+: TRUNCATE TABLE t IMMEDIATE
+  // DB2 z/OS V9+: TRUNCATE TABLE t
   truncate() {
-    return `TRUNCATE TABLE ${this.tableName} IMMEDIATE`;
+    return {
+      sql: `TRUNCATE TABLE ${this.tableName}`,
+    };
   }
 
   // Case-insensitive LIKE via UPPER() wrapping — DB2 is case-sensitive by default.
@@ -83,6 +85,7 @@ class Db2QueryCompiler extends QueryCompiler {
     const schema   = (
       this.single.schema ||
       this.client.connectionSettings?.currentSchema ||
+      this.client.config.connection?.schema ||
       ''
     ).toUpperCase();
     const bindings = [table];
@@ -100,14 +103,31 @@ class Db2QueryCompiler extends QueryCompiler {
       sql,
       bindings,
       output(resp) {
-        const out = resp.reduce((cols, row) => {
-          cols[row.NAME.trim()] = {
-            type:         row.COLTYPE.trim(),
-            maxLength:    row.LENGTH,
-            scale:        row.SCALE,
-            nullable:     row.NULLS === 'Y',
-            defaultValue: row.DEFAULT,
-          };
+        // Handle array response (raw format) or standard structure
+        let rows = [];
+        if (Array.isArray(resp)) {
+          rows = resp;
+        } else if (resp && Array.isArray(resp.rows)) {
+          rows = resp.rows;
+        }
+
+        // Identify mapping strategy by looking at first row
+        const out = rows.reduce((cols, row) => {
+          // If the row acts like an array, we prefer numeric indices if we can't find NAME
+          // In some z/OS environments row.NAME might be undefined but row[0] is correct
+          // However, we MUST check for both '0' (string key) and 0 (numeric index) 
+          // to cover all driver result formats.
+          const name = (row.NAME || row['NAME'] || row[0] || row['0'] || '').toString().trim();
+          
+          if (name && isNaN(name)) {
+            cols[name.toUpperCase()] = {
+              type:         (row.COLTYPE || row['COLTYPE'] || row[1] || row['1'] || '').toString().trim(),
+              maxLength:    row.LENGTH  ?? row['LENGTH']  ?? row[2] ?? row['2'],
+              scale:        row.SCALE   ?? row['SCALE']   ?? row[3] ?? row['3'],
+              nullable:     (row.NULLS || row['NULLS'] || row[4] || row['4']) === 'Y',
+              defaultValue: row.DEFAULT ?? row['DEFAULT'] ?? row[5] ?? row['5'],
+            };
+          }
           return cols;
         }, {});
         return (column && out[column.toUpperCase()]) || out;

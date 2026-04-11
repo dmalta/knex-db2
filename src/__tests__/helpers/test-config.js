@@ -18,16 +18,16 @@ const DB_CONFIG = {
 };
 
 // Test tablespace for DDL operations
-const TEST_TABLESPACE = dbConfig.schema;
+const TEST_TABLESPACE = dbConfig.tablespace;
 
 // Pool configuration for integration tests
 const POOL_CONFIG = {
   min: 1,
   max: 3,
-  acquireTimeoutMillis: 15000,
-  createTimeoutMillis: 15000,
+  acquireTimeoutMillis: 5000,
+  createTimeoutMillis: 5000,
   destroyTimeoutMillis: 5000,
-  idleTimeoutMillis: 30000,
+  idleTimeoutMillis: 10000,
 };
 
 // Environment check for real DB2 tests

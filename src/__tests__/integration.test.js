@@ -25,10 +25,10 @@ describe('DB2 PIMS Integration Tests', () => {
       pool: {
         min: 1,
         max: 5,
-        acquireTimeoutMillis: 10000,
-        createTimeoutMillis: 10000,
+        acquireTimeoutMillis: 5000,
+        createTimeoutMillis: 5000,
         destroyTimeoutMillis: 5000,
-        idleTimeoutMillis: 30000,
+        idleTimeoutMillis: 10000,
       },
     });
   });
