@@ -25,7 +25,6 @@ const db = knex({
     user: 'your-username',
     password: 'your-password',
     schema: 'MYSCHEMA',   // optional — sets CURRENTSCHEMA
-    security: 'SSL',      // optional — enables SSL
   },
   pool: {
     min: 2,
@@ -38,16 +37,15 @@ const db = knex({
 
 | Option | Type | Required | Description |
 |---|---|---|---|
-| `hostname` | string | ✅ | DB2 server hostname |
-| `port` | number | ✅ | Port (default: `50000`) |
-| `database` | string | ✅ | Database name |
-| `user` / `uid` | string | ✅ | Username |
-| `password` / `pwd` | string | ✅ | Password |
-| `schema` | string | — | Sets `CURRENTSCHEMA` |
-| `security` | `'SSL'` | — | Enables SSL |
-| `connectTimeout` | number | — | Sets `CONNECTTIMEOUT` (seconds) |
-| `queryTimeout` | number | — | Sets `QUERYTIMEOUT` (seconds) |
-| `params` | object | — | Any additional ODBC key/value pairs appended to the connection string (see below) |
+| `hostname` | string | Required | DB2 server hostname |
+| `port` | number | Required | Port (default: `50000`) |
+| `database` | string | Required | Database name |
+| `user` / `uid` | string | Required | Username |
+| `password` / `pwd` | string | Required | Password |
+| `schema` | string | Optional | Sets `CURRENTSCHEMA` |
+| `connectTimeout` | number | Optional | Sets `CONNECTTIMEOUT` (seconds) |
+| `queryTimeout` | number | Optional | Sets `QUERYTIMEOUT` (seconds) |
+| `params` | object | Optional | Any additional ODBC key/value pairs appended to the connection string (see below) |
 
 ### Custom Connection Parameters (`params`)
 
@@ -62,19 +60,16 @@ const db = knex({
     database: 'your-database',
     user: 'your-username',
     password: 'your-password',
-    params: {
-      // SSL / TLS
+    // optional additional ODBC parameters
+    params: { 
+      Authentication: '...',
       Security: '...',
       sslConnection: '...',
       sslVersion: '...',
       sslTrustStoreLocation: '...',
       sslTrustStorePassword: '...',
       sslCertLocation: '...',
-      // Authentication
-      AUTHENTICATION: '...',
-      // Enable compatibility for VARCHAR FOR BIT DATA and long data types
-      LONGDATA_COMPAT: '...',
-      // Any other valid ODBC keyword accepted by the IBM DB2 ODBC driver
+      ...
     }
   }
 });
