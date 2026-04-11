@@ -1,18 +1,20 @@
-# knex-db2
+# @dmalta/knex-db2
 
-A [Knex.js](https://knexjs.org/) client adapter for IBM Db2 databases (LUW and z/OS) using the [ibm_db](https://github.com/ibmdb/node-ibm_db/) driver via ODBC.
+A [Knex.js](https://knexjs.org/) client adapter for IBM Db2 for z/OS using the [ibm_db](https://github.com/ibmdb/node-ibm_db/) driver via ODBC.
 
 ## Installation
 
 ```bash
-npm install knex knex-db2 ibm_db
+npm install knex @dmalta/knex-db2 ibm_db
 ```
+
+> IBM Db2 client libraries must also be installed on the host system for `ibm_db` to function.
 
 ## Usage
 
 ```javascript
 const knex = require('knex');
-const Db2Client = require('knex-db2');
+const Db2Client = require('@dmalta/knex-db2');
 
 const db = knex({
   client: Db2Client,
@@ -21,44 +23,140 @@ const db = knex({
     port: 50000,
     database: 'your-database',
     user: 'your-username',
-    password: 'your-password'
+    password: 'your-password',
+    schema: 'MYSCHEMA',   // optional — sets CURRENTSCHEMA
+    security: 'SSL',      // optional — enables SSL
   },
   pool: {
     min: 2,
     max: 10
   }
 });
+```
+
+### Connection Options
+
+| Option | Type | Required | Description |
+|---|---|---|---|
+| `hostname` | string | ✅ | DB2 server hostname |
+| `port` | number | ✅ | Port (default: `50000`) |
+| `database` | string | ✅ | Database name |
+| `user` / `uid` | string | ✅ | Username |
+| `password` / `pwd` | string | ✅ | Password |
+| `schema` | string | — | Sets `CURRENTSCHEMA` |
+| `security` | `'SSL'` | — | Enables SSL |
+| `connectTimeout` | number | — | Sets `CONNECTTIMEOUT` (seconds) |
+| `queryTimeout` | number | — | Sets `QUERYTIMEOUT` (seconds) |
+| `params` | object | — | Any additional ODBC key/value pairs appended to the connection string (see below) |
+
+### Custom Connection Parameters (`params`)
+
+Use `params` to pass any additional ODBC keyword/value pairs directly to the connection string:
+
+```javascript
+const db = knex({
+  client: Db2Client,
+  connection: {
+    hostname: 'your-db2-host',
+    port: 50000,
+    database: 'your-database',
+    user: 'your-username',
+    password: 'your-password',
+    params: {
+      // SSL / TLS
+      Security: '...',
+      sslConnection: '...',
+      sslVersion: '...',
+      sslTrustStoreLocation: '...',
+      sslTrustStorePassword: '...',
+      sslCertLocation: '...',
+      // Authentication
+      AUTHENTICATION: '...',
+      // Enable compatibility for VARCHAR FOR BIT DATA and long data types
+      LONGDATA_COMPAT: '...',
+      // Any other valid ODBC keyword accepted by the IBM DB2 ODBC driver
+    }
+  }
+});
 
 // Standard Knex.js API works seamlessly
 const users = await db('users').select('*');
-const newUser = await db('users').insert({ name: 'John', email: 'john@example.com' });
 const limitedResults = await db('users').limit(10).offset(20);
 ```
 
 ## Features
 
-- **Full Knex.js compatibility** - Drop-in replacement for other Knex clients
-- **DB2 SQL dialect** - Automatic translation to DB2-specific syntax (`FETCH FIRST`, `OFFSET`)
-- **Enhanced error handling** - Comprehensive DB2 error code mapping and categorization
-- **Connection management** - Robust connection pooling and timeout handling
-- **Schema operations** - Complete DDL support for tables, indexes, and constraints
+- **Full Knex.js compatibility** — Drop-in replacement; all standard Knex query-builder methods work
+- **DB2 z/OS SQL dialect** — `FETCH FIRST n ROWS ONLY`, `ROW_NUMBER()` pagination for z/OS V11, `TRUNCATE TABLE … IMMEDIATE`, `FOR UPDATE WITH RS` / `FOR FETCH ONLY` locking
+- **Fast batch insert** — Multi-row inserts use ibm_db's column-wise ARRAY parameter mechanism for a single round-trip (DB2 z/OS does not support multi-VALUES syntax)
+- **`INSERT … RETURNING`** — Single-row inserts with `.returning()` are wrapped in `SELECT … FROM FINAL TABLE (INSERT …)`
+- **CTEs** — `WITH` clauses work; the `RECURSIVE` keyword is stripped automatically for z/OS compatibility
+- **Case-insensitive `LIKE`** — `.whereILike()` emits `UPPER(col) LIKE UPPER(?)`
+- **Column introspection** — `.columnInfo()` queries `SYSIBM.SYSCOLUMNS`
+- **Tablespace support** — `t.tablespace('SCHEMA.TSNAME')` in `createTable` callbacks
+- **Transactions** — Configurable isolation levels (`READ UNCOMMITTED`, `READ COMMITTED`, `REPEATABLE READ`, `SERIALIZABLE`) and SQL savepoints
+- **Enhanced error handling** — Comprehensive DB2 SQLCODE mapping and categorization
+- **Connection management** — Pooling, connection timeout, SSL, schema, and `SYSIBM.SYSDUMMY1` health checks
+- **Schema operations** — Full DDL support for tables, indexes, and constraints
+
+## Fast Batch Insert
+
+When inserting an array of rows, the client automatically switches to ibm_db's ARRAY parameter mode, sending all rows in a **single SQL round-trip** instead of one statement per row:
+
+```javascript
+await db('employees').insert([
+  { id: 1, name: 'Alice', dept: 'Engineering' },
+  { id: 2, name: 'Bob',   dept: 'Marketing'   },
+  { id: 3, name: 'Carol', dept: 'Engineering' },
+]);
+// Executes: INSERT INTO employees (id, name, dept) VALUES (?, ?, ?)
+// with ibm_db ARRAY params — one round-trip for all rows
+```
+
+> `.returning()` is not supported with bulk (multi-row) inserts. Insert rows individually if you need returned values.
+
+## INSERT … RETURNING
+
+Single-row inserts support `.returning()` via DB2's `FINAL TABLE` syntax:
+
+```javascript
+const [row] = await db('employees')
+  .insert({ name: 'Alice', dept: 'Engineering' })
+  .returning(['id', 'created_at']);
+// Executes: SELECT id, created_at FROM FINAL TABLE (INSERT INTO employees …)
+```
 
 ## Error Handling
 
-The client provides enhanced error handling with DB2-specific error categorization:
-
 ```javascript
-const { DB2Error, isRetryableError } = require('knex-db2');
+const { DB2Error } = require('@dmalta/knex-db2');
 
 try {
-  const results = await db('employees').select('*');
+  await db('employees').select('*');
 } catch (error) {
   if (error instanceof DB2Error) {
-    console.log('Error Type:', error.errorType);
-    console.log('Category:', error.errorCategory);
-    console.log('Is Retryable:', error.isRetryable());
+    console.log('Error type:',     error.errorType);
+    console.log('Category:',       error.errorCategory);
+    console.log('Is retryable:',   error.isRetryable());
   }
 }
+```
+
+## Transactions & Isolation Levels
+
+```javascript
+// Set isolation level at the client level
+const db = knex({
+  client: Db2Client,
+  connection: { … },
+  isolationLevel: 'READ COMMITTED', // or 'REPEATABLE READ', 'SERIALIZABLE', etc.
+});
+
+// Use transactions as normal — savepoints are also supported
+await db.transaction(async (trx) => {
+  await trx('accounts').where({ id: 1 }).update({ balance: knex.raw('balance - 100') });
+  await trx('accounts').where({ id: 2 }).update({ balance: knex.raw('balance + 100') });
+});
 ```
 
 ## Data Type Mapping
@@ -76,27 +174,17 @@ try {
 
 ## Limitations
 
-This package provides core Knex.js functionality for Db2, but some advanced features are not yet implemented:
-
-- **Custom transactions** - Uses Knex default transaction handling
-- **Stored procedures** - No support for calling Db2 stored procedures
-- **Advanced Db2 features** - No support for sequences, CTEs, or bulk operations
-- **Migration optimizations** - Uses standard Knex migrations (not Db2-optimized)
-- **Performance tuning** - No Db2-specific performance optimizations
-- **Db2 for IBM i** - Not supported (use [@bdkinc/knex-ibmi](https://www.npmjs.com/package/@bdkinc/knex-ibmi) instead)
+- **Stored procedures** — Not supported
+- **`.returning()` with bulk inserts** — Not supported; use single-row inserts instead
+- **DB2 for IBM i** — Not supported (use [@bdkinc/knex-ibmi](https://www.npmjs.com/package/@bdkinc/knex-ibmi) instead)
 
 ## Requirements
 
-- Node.js 14+
+- Node.js 16+
 - IBM Db2 client libraries installed on the system
-- Access to IBM Db2 LUW or z/OS database
-- [ibm_db](https://github.com/ibmdb/node-ibm_db/) driver (automatically installed with this package)
-
-## Documentation
-
-- **[Windows DB2 Client Setup](./docs/windows-db2-client-setup.md)** - Installation guide for Windows
-- **[Troubleshooting](./docs/troubleshooting-checklist.md)** - Common issues and solutions
-- **[Error Handling](./docs/error-handling-examples.md)** - Comprehensive error handling guide
+- Access to an IBM Db2 for z/OS database
+- [ibm_db](https://github.com/ibmdb/node-ibm_db/) `^3.3.2` (peer dependency)
+- [knex](https://knexjs.org/) `^3.0.0` (peer dependency)
 
 ## License
 
