@@ -181,6 +181,11 @@ await db.transaction(async (trx) => {
 - [ibm_db](https://github.com/ibmdb/node-ibm_db/) `^3.3.2 || ^4.0.0` (peer dependency)
 - [knex](https://knexjs.org/) `^3.0.0` (peer dependency)
 
+> **npm 11+ users:** `ibm_db` runs a native install script (`installer/driverInstall.js`) to fetch
+> and build its DB2 CLI driver. If your npm config restricts install scripts (npm 11.5+'s
+> `allow-scripts` setting), that script — and `ibm_db` itself — won't run, and the driver won't be
+> installed. Run `npm approve-scripts ibm_db` in your project to allow it.
+
 ## Compatibility Notes
 
 An external project ran a time-boxed, read-only feasibility spike (Sept 2026) wiring this driver
