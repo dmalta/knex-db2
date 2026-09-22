@@ -178,45 +178,11 @@ await db.transaction(async (trx) => {
 - Node.js 16+
 - IBM Db2 client libraries installed on the system
 - Access to an IBM Db2 for z/OS database
-- [ibm_db](https://github.com/ibmdb/node-ibm_db/) `^3.3.2 || ^4.0.0` (peer dependency)
+- [ibm_db](https://github.com/ibmdb/node-ibm_db/) `^4.0.0` (peer dependency)
 - [knex](https://knexjs.org/) `^3.0.0` (peer dependency)
 
 > If your npm is configured to restrict install scripts, run `npm approve-scripts ibm_db` so its
 > native driver installer can run.
-
-## Compatibility Notes
-
-An external project ran a time-boxed, read-only feasibility spike (Sept 2026) wiring this driver
-into AdonisJS Lucid ORM against a real DB2 for z/OS database, using `ibm_db@4.0.1`. This driver
-is not "Lucid-compatible" out of the box — the spike needed an external shim in the consuming
-application to register the client with Lucid at all — but the following were confirmed working:
-
-- Connection and raw query execution
-- The query builder's `limit`/`offset` (`FETCH FIRST` / `ROW_NUMBER()` emulation)
-- Row mapping into a model class
-- A `TIMESTAMP` column round-tripping through Luxon-style datetime parsing
-- Transactions (`begin`/`commit`, read-only)
-- Multiple concurrently-open named connections
-
-**Known sharp edge: alias casing.** DB2 for z/OS uppercases any unquoted identifier at the engine
-level, and this driver's `wrapIdentifierImpl` (`src/client.js`) intentionally returns identifiers
-unquoted (correct, documented DB2 semantics, relied on elsewhere by consumers of this driver).
-This surprises ORM code written with Postgres/MySQL case-folding assumptions. Concrete example
-from the spike:
-Lucid's `.paginate()` runs `.count('* as total')` and then reads `result[0].total` back, but DB2
-returns `TOTAL` instead — `Number(undefined)` is `NaN`, and Lucid guards its page query behind
-`total > 0`, so the consumer silently gets an empty page back with no error.
-
-This isn't this driver's bug to fix unilaterally, but the eventual fix would be to selectively
-quote only *synthesized* aliases that the query compiler itself generates (the `AS <alias>` a
-compiler emits for things like aggregate results), while leaving user-supplied table/column
-identifiers unquoted exactly as today — quoting an alias makes DB2 preserve its case instead of
-folding it to uppercase, without changing the uppercase-folding behavior existing consumers
-already depend on for ordinary identifiers. The likely touch point for that future change is the
-alias-emission code in `src/query/db2-querycompiler.js` — not `wrapIdentifierImpl`, since that
-function is used for all identifiers, not just synthesized aliases. That change would need its
-own unit test (asserting the compiler emits a quoted alias) and a live-DB2 integration test
-(asserting the round-tripped key preserves case) before it should ship; it is not attempted here.
 
 ## License
 
