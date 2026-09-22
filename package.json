@@ -54,7 +54,7 @@
     "vitest": "^3.0.0"
   },
   "peerDependencies": {
-    "ibm_db": "^3.3.2",
+    "ibm_db": "^3.3.2 || ^4.0.0",
     "knex": "^3.0.0"
   },
   "engines": {
