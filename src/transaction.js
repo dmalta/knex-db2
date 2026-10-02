@@ -1,5 +1,6 @@
 'use strict';
 const Transaction = require('knex/lib/execution/transaction');
+const { restoreAutocommit } = require('./autocommit');
 
 // DB2 isolation level constants (maps to ODBC SQL_TXN_* values)
 const ISOLATION_LEVELS = {
@@ -29,11 +30,25 @@ class Db2Transaction extends Transaction {
       }
     }
 
-    await connection.beginTransaction();
+    try {
+      await connection.beginTransaction();
+    } catch (err) {
+      // Knex releases the connection without calling commit/rollback when begin
+      // fails, so make sure it does not go back to the pool with autocommit off.
+      await restoreAutocommit(connection);
+      throw err;
+    }
   }
 
+  // ibm_db's beginTransaction turns autocommit off on the connection; commit and
+  // rollback put it back on (when autocommit is enabled) before Knex releases the
+  // connection to the pool.
   async commit(connection, value) {
-    await connection.commitTransaction();
+    try {
+      await connection.commitTransaction();
+    } finally {
+      await restoreAutocommit(connection);
+    }
     // _resolver is set by Knex's Transaction base class during _evaluateContainer.
     // Guard for unit-test contexts where `this` may be null or incomplete.
     if (this && typeof this._resolver === 'function') {
@@ -49,6 +64,7 @@ class Db2Transaction extends Transaction {
     } catch {
       // Resolve even on rollback error — propagate original error to caller.
     }
+    await restoreAutocommit(connection);
     if (this && typeof this._resolver === 'function') {
       this._completed = true;
       if (error !== undefined && error !== null) {

@@ -17,6 +17,7 @@ const { handleDB2Error, DB2_ERROR_MAP } = require('./db2-errors');
 const { Db2SchemaCompiler } = require('./schema/db2-schemacompiler');
 const { Db2TableCompiler } = require('./schema/db2-tablecompiler');
 const { Db2Transaction } = require('./transaction');
+const { autocommitEnabled, enableAutocommit } = require('./autocommit');
 
 // Add DB2-specific tablespace() method to the table builder callback API.
 // Usage: db.schema.createTable(name, (t) => { t.tablespace('SCHEMA.TSNAME'); ... })
@@ -105,10 +106,17 @@ class Db2Client extends Client {
           connection.__knex__acquired = new Date();
           connection.__knex__db2_client = this;
 
-          // Set connection-level options
-          this.setConnectionOptions(connection);
-
-          resolve(connection);
+          // Set connection-level options (autocommit) before handing the
+          // connection to the pool. If that fails, close it and fail the acquire.
+          this.setConnectionOptions(connection).then(
+            () => resolve(connection),
+            (optErr) => {
+              try {
+                connection.close(() => {});
+              } catch {}
+              reject(this.handleError(optErr));
+            }
+          );
         });
       } catch (error) {
         reject(error);
@@ -144,14 +152,15 @@ class Db2Client extends Client {
     return options.join(';') + ';';
   }
 
-  // Set DB2-specific connection options
+  // Set DB2-specific connection options.
+  // autocommit (default: true) turns autocommit on for every new connection, so a
+  // statement run outside a Knex transaction never leaves a unit of work (and its
+  // locks) open. With autocommit: false the connection is left as the ODBC/CLI
+  // configuration opens it. Returns a Promise.
   setConnectionOptions(connection) {
-    // Set autocommit mode (default: true for Knex compatibility)
-    const autocommit = this.config.connection?.autocommit !== false;
-
-    // Note: ibm_db handles autocommit differently, this is a placeholder
-    // for when we need to set specific DB2 connection attributes
+    const autocommit = autocommitEnabled(this.config.connection);
     connection.__knex__autocommit = autocommit;
+    return autocommit ? enableAutocommit(connection) : Promise.resolve();
   }
 
   // Enhanced connection closing with proper cleanup

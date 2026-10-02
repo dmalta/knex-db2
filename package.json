@@ -4,6 +4,7 @@
   "description": "A Knex.js client for IBM Db2 for z/OS",
   "main": "src/index.js",
   "files": [
+    "src/autocommit.js",
     "src/client.js",
     "src/db2-errors.js",
     "src/index.js",

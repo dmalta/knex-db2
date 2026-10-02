@@ -45,6 +45,7 @@ const db = knex({
 | `schema` | string | Optional | Sets `CURRENTSCHEMA` |
 | `connectTimeout` | number | Optional | Sets `CONNECTTIMEOUT` (seconds) |
 | `queryTimeout` | number | Optional | Sets `QUERYTIMEOUT` (seconds) |
+| `autocommit` | boolean | Optional | Run connections with autocommit on (default: `true`). See [Autocommit](#autocommit) |
 | `params` | object | Optional | Any additional ODBC key/value pairs appended to the connection string (see below) |
 
 ### Custom Connection Parameters (`params`)
@@ -153,6 +154,27 @@ await db.transaction(async (trx) => {
   await trx('accounts').where({ id: 2 }).update({ balance: knex.raw('balance + 100') });
 });
 ```
+
+## Autocommit
+
+By default (`autocommit: true`) every connection the client opens is switched to autocommit
+mode before it enters the pool, and after each Knex transaction commits or rolls back the
+connection's autocommit is turned back on before it is released. Only the statements inside
+`db.transaction(...)` run with autocommit off.
+
+This matters on DB2 for z/OS: a connection that ends a statement without committing keeps its
+unit of work open, and every open unit of work holds locks (for example a share lock on the
+database descriptor when the dynamic statement cache is off) that block other sessions'
+`CREATE`/`DROP` with SQL0911N/SQL0913N timeouts and deadlocks.
+
+If autocommit cannot be turned on for a new connection, the acquire fails. If it cannot be
+restored after a transaction, the connection is discarded instead of being returned to the pool.
+
+Set `autocommit: false` to opt out: the client then leaves each connection in whatever mode the
+ODBC/CLI configuration opens it (for example `params: { AUTOCOMMIT: 0 }` or `db2cli.ini`) and
+does not touch it after transactions. You are then responsible for committing.
+(Note that ibm_db's own `commitTransaction`/`rollbackTransaction` switch autocommit back on
+when a Knex transaction ends, whatever this setting says.)
 
 ## Data Type Mapping
 
