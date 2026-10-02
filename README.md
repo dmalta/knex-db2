@@ -200,11 +200,15 @@ when a Knex transaction ends, whatever this setting says.)
 - Node.js 16+
 - IBM Db2 client libraries installed on the system
 - Access to an IBM Db2 for z/OS database
-- [ibm_db](https://github.com/ibmdb/node-ibm_db/) `^4.0.0` (peer dependency)
+- [ibm_db](https://github.com/ibmdb/node-ibm_db/) `^3.3.2 || ^4.0.0` (peer dependency)
 - [knex](https://knexjs.org/) `^3.0.0` (peer dependency)
 
 > If your npm is configured to restrict install scripts, run `npm approve-scripts ibm_db` so its
 > native driver installer can run.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the changes in each release.
 
 ## License
 
